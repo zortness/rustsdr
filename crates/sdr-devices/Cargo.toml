@@ -1,0 +1,30 @@
+[package]
+name = "sdr-devices"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+libloading = { version = "0.8.9", optional = true }
+rs-rtl = { version = "=0.5.0", optional = true }
+sdr-core.workspace = true
+serialport = { version = "4.10.1", default-features = false, optional = true }
+
+[features]
+default = ["rtl-rust"]
+rtl = ["dep:libloading"]
+cat = ["dep:serialport"]
+rtl-rust = ["rtl", "dep:rs-rtl"]
+
+[[example]]
+name = "rtl_probe"
+required-features = ["rtl"]
+
+[[example]]
+name = "qmx_probe"
+required-features = ["cat"]
+
+[[example]]
+name = "ic705_probe"
+required-features = ["cat"]

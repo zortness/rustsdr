@@ -1,0 +1,10 @@
+[package]
+name = "sdr-dsp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustfft = "6.4.1"
+sdr-core.workspace = true

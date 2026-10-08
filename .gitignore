@@ -1,0 +1,8 @@
+/target/
+/third-party/**/*.dll
+/third-party/**/*.exe
+/third-party/**/*.lib
+/third-party/**/*.exp
+/third-party/**/*.zip
+/trace/
+
