@@ -1,0 +1,9 @@
+# Use --no-deps to avoid the legacy PySoundFile dependency.
+sstv @ git+https://github.com/colaclanth/sstv.git@3e556eee8ad4c4425799cb652bac26ee58f8e113
+Pillow==11.3.0
+numpy==2.5.4
+scipy==1.18.1
+soundfile==0.14.0
+cffi==2.1.1
+pycparser==3.11
+typing_extensions==4.16.0

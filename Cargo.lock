@@ -4116,6 +4116,7 @@ dependencies = [
  "sdr-dsp",
  "serde",
  "serde_json",
+ "sstv",
  "tracing",
  "windows 0.61.3",
 ]
@@ -4327,6 +4328,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
 dependencies = [
  "bitflags 2.13.2",
+]
+
+[[package]]
+name = "sstv"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44268b9fe27023e58f42245a600dce6d4a32b77d438dd9e5ddf92bd8d220fa2e"
+dependencies = [
+ "libm",
 ]
 
 [[package]]

@@ -12,6 +12,8 @@ pub mod practice_midi;
 pub mod preferences;
 pub mod scanning;
 pub mod spectrum_view;
+#[cfg(feature = "sstv")]
+pub mod sstv;
 pub mod tuning;
 pub mod waterfall_labels;
 

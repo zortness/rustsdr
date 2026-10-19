@@ -1,6 +1,18 @@
 # Implementation status
 
-Updated: 2026-10-03. M01 remains in progress; live RTL-SDR integration was brought forward after the user connected a dongle.
+Updated: 2026-10-13. M01 remains in progress; live RTL-SDR integration was brought forward after the user connected a dongle.
+
+## SSTV service exploration (2026-10-13)
+
+The user accepted the SSTV plan. Added an opt-in `sstv` codec/service prototype,
+pinned MIT-licensed sstv 0.3.1, headless probes and bounded cancellable PCM input.
+All four initial modes decode independent PySSTV fixtures completely. Nine
+targeted tests (including the opt-in fixture test), workspace tests, strict
+Clippy, formatting, desktop-plus-SSTV build and hardware-free checks passed.
+Reverse encoder validation remains open: the independent decoder has similar
+image errors for our audio and PySSTV controls, and does not support PD120.
+The service is not wired into the engine/GUI or any transmit path. See the
+[spike report and next integration boundary](sstv-spike.md).
 
 ## IC-705 USB interface (2026-10-03)
 

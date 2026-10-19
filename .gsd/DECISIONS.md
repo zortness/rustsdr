@@ -1,5 +1,7 @@
 # Decision index
 
+- 2026-10-13: User accepted the SSTV receive/encode/workspace plan and requested service exploration. Optional sstv 0.3.1 prototype is a receive candidate; independent encoder quality validation remains open. Engine integration and UI/RF transmission are subsequent work. See [proposal](../docs/sstv-proposal.md) and [spike evidence](../docs/sstv-spike.md).
+
 - 2026-09-25: User prioritized memories and scanning before additional modes, prefers simple CSV files, and chose a fixed configurable signal pause followed by continued scanning. Stop scan must hold the current frequency/mode and allow restart. Implemented CSV groups, recall navigation, worker-owned memory/VFO scans and explicit stop-at-current; see [memory and scan design](../docs/memories-and-scanning.md).
 
 
