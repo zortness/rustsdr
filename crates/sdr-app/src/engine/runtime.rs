@@ -456,6 +456,9 @@ fn run_live(
                 if let Some(stream) = &audio {
                     state.audio_underruns = stream.counters.underruns.load(Ordering::Relaxed);
                     state.audio_overruns = stream.counters.overruns.load(Ordering::Relaxed);
+                    state.audio_queue_frames = Some(stream.queued_samples());
+                    state.audio_output_rate_hz = Some(stream.sample_rate());
+                    state.audio_output_device = Some(stream.device_label().to_owned());
                     if stream.counters.failed.load(Ordering::Relaxed) {
                         state.audio_error =
                             Some("Audio output disconnected or failed; stop/start to retry".into());

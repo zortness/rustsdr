@@ -65,6 +65,8 @@ pub fn show(
                 ("Dropped IQ samples", status.iq_drops.to_string()),
                 ("Intentional retune discards", status.retune_discarded.to_string()),
                 ("Audio underruns / overruns", format!("{} / {}",status.audio_underruns,status.audio_overruns)),
+                ("Audio queue / output rate", format!("{} frames / {} Hz", status.audio_queue_frames.map_or("n/a".into(), |n| n.to_string()), status.audio_output_rate_hz.map_or("n/a".into(), |n| n.to_string()))),
+                ("Audio output device", status.audio_output_device.clone().unwrap_or_else(|| "n/a".into())),
                 ("Audio RMS",format!("{:.3}",status.audio_rms)),
                 ("Receiver / capture revision",format!("{} / {}",status.revision,status.capture_revision)),
             ] { ui.label(label); ui.monospace(value); ui.end_row(); }

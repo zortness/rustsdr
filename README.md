@@ -121,6 +121,18 @@ cargo run -p sdr-app --features desktop -- --gui --rtl --smoke-test
 
 The live GUI smoke test stops/restarts, selects 89.9 MHz, clicks the waterfall, scrolls center frequency, verifies retained capture/history, resizes, saves `target/rtl-smoke.png`, and exits after approximately 15 seconds. It requires the radio and a graphical desktop. The development profile optimizes DSP/device crates for live processing; use a release build for performance evaluation.
 
+### Instrumented reception soak
+
+Build once, then run the release executable on a connected RTL-SDR with a working audio output:
+
+```powershell
+cargo build -p sdr-app --release --features desktop --offline
+$env:WGPU_BACKEND = 'dx12' # AMD Radeon 8060S / Windows 11 acceptance configuration
+.\target\release\sdr-app.exe --gui --rtl --mode stereo --soak 1800 --soak-interval 10
+```
+
+The runner accumulates IQ, audio and display loss counters every GUI frame and samples audio queue occupancy, process memory, CPU and frame rate for the CSV. Every 200 seconds it settles, resizes, fits and restores spectrum span, tunes the VFO, scrolls the capture center, then stops and restarts reception. The summary requires observed effects for those interactions. It writes `soak.csv`, `soak-summary.json` and `soak-final.png` under a timestamped `target/soak/` directory, then exits with a failure code if a measured gate fails. The memory trend starts after the 40-second settling phase and uses observations while receiving; the current gate limits its fitted slope to 10 MiB/hour and its first-to-last quartile median increase to 16 MiB. A short diagnostic needs at least 215 seconds to cover one full interaction cycle; use 1800 seconds for the M01 duration gate. Intentional retune discards and skipped display frames are reported separately from IQ drops and audio faults. The counters detect host-side loss; they do not establish upstream USB continuity or audible quality. The [measured RTL-SDR baseline](docs/soak-results.md) passed these gates on this host with Direct3D 12; the default Vulkan renderer showed sustained Windows Event-handle growth and failed the memory gate.
+
 ## Tuning controls
 
 - **Click or drag** on spectrum/waterfall: tune the VFO, snapped to the selected step.

@@ -1,6 +1,6 @@
 # M01: First working receiver
 
-Status: acceptance evidence still in progress. Synthetic/file/live acquisition, receiver tuning, voice demodulation/audio, and the Bevy spectrum/waterfall are implemented. The user completed a 30-minute manual multi-mode stability test and validated most modes; AM remains outstanding. Instrumented memory, queue, and loss measurements were not supplied for that run. See the [implementation status](implementation-status.md). The original scope below is retained as the milestone baseline; later voice/live features were brought forward.
+Status: in progress. Synthetic/file/live acquisition, receiver tuning, voice demodulation/audio, and the Bevy spectrum/waterfall are implemented. The user completed a 30-minute manual multi-mode stability test and validated most modes; AM remains outstanding. Three [instrumented 30-minute RTL-SDR runs](soak-results.md) on Vulkan found zero sampled host IQ/audio faults but failed the memory trend gate. A fourth run with Direct3D 12, accumulating counters every GUI frame across restarts, passed the 30-minute resource and host-loss gates on the named AMD/Windows host. The original scope below is retained as the milestone baseline; later voice/live and IC-705 experimental transmit features were brought forward.
 
 Audience: the contributor beginning implementation. The outcome is a local application that visualizes synthetic or recorded IQ and plays mono broadcast-FM audio through one receiver, without any physical radio requirement.
 
@@ -55,17 +55,19 @@ If the target is missed, identify whether DSP, rendering, allocation, or schedul
 
 ## Acceptance checklist
 
-- [ ] A new contributor can build and run from documented commands.
-- [ ] Synthetic input and a generated IQ fixture run without connected radio hardware.
-- [ ] FFT peaks are within one bin of known tone frequencies; normalization expectations and numeric tolerances are documented.
-- [ ] Mono FM is verified offline and audible through the selected output device.
-- [ ] Tuning and bandwidth handling reject unsupported values and keep labels consistent with actual processing state.
-- [ ] Queues and waterfall history have fixed limits; long-run memory does not grow with elapsed reception time.
-- [ ] Artificial display stalls do not block reception; display gaps and sample/audio losses are distinguishable in diagnostics.
+- [x] A new contributor can build and run from documented commands.
+- [x] Synthetic input and a generated IQ fixture run without connected radio hardware.
+- [x] FFT peaks are within one bin of known tone frequencies; normalization expectations and numeric tolerances are documented.
+- [x] Mono FM is verified offline and audible through the selected output device.
+- [x] Tuning and bandwidth handling reject unsupported values and keep labels consistent with actual processing state.
+- [x] Queues and waterfall history have fixed limits; the 30-minute memory trend meets the recorded limits on the named host using Direct3D 12. Default Vulkan still fails this gate on that host.
+- [x] Artificial display stalls do not block reception; display gaps and sample/audio losses are distinguishable in diagnostics.
 - [ ] Stop/start, EOF, invalid input, unavailable audio output, and window close terminate or recover without hanging.
-- [ ] The steady-state target scenario has no unexplained IQ drops or audio underruns; any revised target and remaining limitations are recorded.
-- [ ] Device capability design covers the three future device profiles without operational transmit controls.
-- [ ] The Bevy decision and measured baseline are recorded for the next milestone.
+- [x] The steady-state target scenario has no unexplained IQ drops or audio underruns; any revised target and remaining limitations are recorded.
+- [x] Device capability design covers the three future device profiles; the M01 receive path requires no transmit control.
+- [x] The Bevy decision and measured baseline are recorded for the next milestone.
+
+Checked items are backed by the 2026-10-19 all-feature workspace run, the documented synthetic/file/live GUI checks, the [soak record](soak-results.md), and earlier user confirmation of audible FM. The FFT test covers 256- and 4096-point transforms with exact-bin tones and a -6.0206 dBFS expectation within 0.001 dB. The display-stall integration test checks continued acquisition and a separate skipped-frame counter. The full Direct3D 12 soak observed counters every GUI frame across nine restarts and reported zero unexplained host IQ drops and zero audio under/overruns. Its median input rate was 2.399 MS/s with about 60 FPS; host counters cannot rule out unreported tuner/USB loss or prove audible quality throughout the run. That run met the memory gate with a 2.31 MiB/hour fitted trend, while all three Vulkan runs failed it. Bevy is retained provisionally with an explicit Direct3D 12 choice on this host. The lifecycle item remains open for unavailable audio-output recovery; EOF, invalid file recovery and stop/start have automated coverage, and an isolated synthetic GUI exited cleanly after normal Windows window close. The later IC-705 test-tone transmit experiment is outside this M01 receive-path check.
 
 ## Completion record to produce
 

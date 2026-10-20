@@ -75,7 +75,7 @@ Keep discovery and adapters independent of panel rendering. Device-specific cont
 
 ## Transmit and transceiver provisions
 
-Transmission is designed for, but not implemented in receive milestones. Validate the conceptual contracts against three device profiles:
+Transmission was outside the M01/M02 receive scope. A later IC-705 experiment added a bounded test-tone transmit path, but no live RF transmission has been validated; it is not M01/M02 acceptance evidence. Validate the conceptual contracts against three device profiles:
 
 1. A receive-only IQ device: receive streaming and tuning, no transmit capability.
 2. An IQ transceiver: receive and transmit streams with device-specific duplex and shared-clock constraints.

@@ -1,0 +1,7 @@
+2026-10-19 local / 2026-10-20 UTC
+Command: .\target\soak\window-close-probe.ps1
+Environment: WGPU_BACKEND=dx12; isolated RUSTSDR_CONFIG_DIR under target/
+Input: synthetic GUI (no radio)
+Action: PostMessageW(WM_CLOSE) to the RustSDR window after startup
+Result: pid=82092 window=8134668 exit=0
+The probe script is archived beside this record.

@@ -1,0 +1,8 @@
+2026-10-20T00:50:46.339420Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: "Windows 11 Pro", kernel: "26200", cpu: "AMD RYZEN AI MAX+ 395 w/ Radeon 8060S", core_count: "16", memory: "95.6 GiB" }
+2026-10-20T00:50:46.421523Z  INFO bevy_render::renderer: AdapterInfo { name: "AMD Radeon(TM) 8060S Graphics", vendor: 4098, device: 5510, device_type: IntegratedGpu, driver: "32.0.31007.5012", driver_info: "", backend: Dx12 }
+2026-10-20T00:50:46.510025Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on this device.
+2026-10-20T00:50:46.512246Z  INFO bevy_egui::render: Using bindless_mode_array_size 16 (Device maximum 1048576)
+2026-10-20T00:50:46.517674Z  INFO bevy_winit::system: Creating new window RustSDR (0v0)
+2026-10-20T00:50:49.186970Z  INFO sdr_app::gui::zoom_smoke: Zoom smoke: Fit receiver delivered 2.289 Hz/bin without capture/revision change
+2026-10-20T00:50:49.240549Z  INFO bevy_render::view::window::screenshot: Screenshot saved to target/zoom-smoke.png
+2026-10-20T00:50:49.953942Z  INFO sdr_app::gui::zoom_smoke: Zoom smoke: full span restored; history retained

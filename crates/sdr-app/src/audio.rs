@@ -30,6 +30,7 @@ struct QueuedSample {
 
 pub struct AudioOutput {
     _stream: cpal::Stream,
+    device_label: String,
     producer: HeapProd<QueuedSample>,
     pub counters: Arc<AudioCounters>,
     rate: u32,
@@ -53,6 +54,14 @@ impl AudioOutput {
         self.producer.occupied_len()
     }
 
+    pub fn sample_rate(&self) -> u32 {
+        self.rate
+    }
+
+    pub fn device_label(&self) -> &str {
+        &self.device_label
+    }
+
     pub fn open(volume: Arc<AtomicU32>) -> Result<Self, String> {
         let device = cpal::default_host()
             .default_output_device()
@@ -64,7 +73,8 @@ impl AudioOutput {
         Self::open_device(device, volume)
     }
     fn open_device(device: cpal::Device, volume: Arc<AtomicU32>) -> Result<Self, String> {
-        if is_radio_output(&device_label(&device)?) {
+        let label = device_label(&device)?;
+        if is_radio_output(&label) {
             return Err(
                 "Radio audio cannot be used as a monitor output; select speakers/headphones".into(),
             );
@@ -94,6 +104,7 @@ impl AudioOutput {
         stream.play().map_err(|e| e.to_string())?;
         Ok(Self {
             _stream: stream,
+            device_label: label,
             producer,
             counters,
             rate,

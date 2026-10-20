@@ -495,7 +495,9 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
             if fit.clicked() {
                 display.fit_receiver();
             }
-            if ui.button("Full span").clicked() {
+            let full = ui.button("Full span");
+            display.full_span_position = Some(full.rect.center());
+            if full.clicked() {
                 display.zoom = 1.0;
             }
         });

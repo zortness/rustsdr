@@ -1,6 +1,10 @@
 # Implementation status
 
-Updated: 2026-10-13. M01 remains in progress; live RTL-SDR integration was brought forward after the user connected a dongle.
+Updated: 2026-10-19. M01 and M02 remain in progress; live RTL-SDR integration was brought forward after the user connected a dongle. Sections below retain their original checkpoint dates, so earlier statements about pending tests describe those earlier checkpoints.
+
+## M01/M02 acceptance pass (2026-10-18–19)
+
+Three instrumented 30-minute Vulkan release runs on the RTL-SDR v3/R820T measured about 2.398 MS/s median input, roughly 60 median FPS, and nine successful software stop/start cycles each. The third observed cumulative counters every GUI frame across restarts and recorded zero unexplained host IQ drops or audio under/overruns. All three failed the memory gate, rising by about 38–40 MiB. The in-place waterfall texture update kept Bevy image assets at five but did not change that outcome. Independent Windows sampling during the third run found Event handles increasing around 30 per second; memory steps coincided with handle counts near 8,000, 16,000 and 32,000. A hardware-free GUI smoke reproduced the handle trend on Vulkan and held steady on Direct3D 12. A full 30-minute Direct3D 12 RTL run passed all instrumented gates: 4.21 billion delivered samples, zero host IQ/audio faults, nine verified restarts, 59.96 median FPS, and resident memory 251.72 to 252.28 MiB with a 2.31 MiB/hour fitted trend. Independent handle sampling remained between 543 and 575. An isolated synthetic Direct3D 12 GUI also exited cleanly on normal window close. See the [soak record and raw evidence](soak-results.md) and the [M01](milestone-01.md) and [M02](milestone-02.md) checklists. Unavailable audio-output recovery, repeated physical reconnect, RTL device selection, and selectable gain/sample rate remain open. Bevy is retained provisionally with an explicit renderer choice on this host; default Vulkan still fails its memory gate.
 
 ## SSTV service exploration (2026-10-13)
 
@@ -239,7 +243,7 @@ User USB recovery validation on 2026-09-24: unplugging the RTL-SDR stopped recep
 
 1. User priority: validate the implemented stereo WFM, AM, NFM, USB/LSB modes and design optional decoders. See [receiver modes](receiver-modes.md) and the [mode backlog](mode-backlog.md).
 2. Retain missing-audio-endpoint, repeated retuning, output-rate-change, and repeated USB recovery checks as follow-up validation. A manual RTL-SDR unplug/reconnect and restart has been confirmed by the user.
-3. The user has completed the 30-minute manual multi-mode test. Instrumented release-profile measurements remain unrecorded; retain those evidence gaps separately from the completed manual test.
+3. The user has completed the 30-minute manual multi-mode test. Four instrumented release-profile runs are now [recorded](soak-results.md); the fourth passed the memory and host-loss gates with Direct3D 12. The three earlier Vulkan runs failed memory, and the first two used a counter collector that could miss totals across restarts.
 
 Preserve headless tests and future transmit/transceiver boundaries. Do not mark M01 complete until its remaining acceptance criteria have evidence.
 

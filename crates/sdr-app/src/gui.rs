@@ -31,6 +31,8 @@ mod qmx;
 mod rtl_smoke;
 #[path = "gui_settings.rs"]
 mod settings;
+#[path = "gui_soak.rs"]
+mod soak;
 #[path = "gui_zoom_smoke.rs"]
 mod zoom_smoke;
 #[derive(Resource)]
@@ -52,6 +54,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut file_rate = None;
     let mut mode = Mode::WfmMono;
     let mut rtl_backend = None;
+    let mut soak_seconds: Option<f64> = None;
+    let mut soak_interval: f64 = 10.0;
     let mut args = arguments.iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -74,7 +78,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--file" => file_path = Some(args.next().ok_or("--file requires a path")?.clone()),
             "--center-hz" => file_center = Some(args.next().ok_or("--center-hz requires a value")?.parse::<u64>()?),
             "--sample-rate" => file_rate = Some(args.next().ok_or("--sample-rate requires a value")?.parse::<u32>()?),
-            _ => return Err("usage: --gui [--rtl | --file PATH --center-hz HZ --sample-rate 2400000] [--smoke-test]".into()),
+            "--soak" => soak_seconds = Some(args.next().ok_or("--soak requires seconds")?.parse::<f64>()?),
+            "--soak-interval" => soak_interval = args.next().ok_or("--soak-interval requires seconds")?.parse::<f64>()?,
+            _ => return Err("usage: --gui [--rtl | --file PATH --center-hz HZ --sample-rate 2400000] [--smoke-test | --soak SECONDS --soak-interval SECONDS]".into()),
         }
     }
     let compact = arguments.iter().any(|arg| arg == "--compact-smoke");
@@ -119,6 +125,23 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let playback = file_path.is_some();
+    if soak_seconds.is_none() && arguments.iter().any(|arg| arg == "--soak-interval") {
+        return Err("--soak-interval requires --soak".into());
+    }
+    if let Some(seconds) = soak_seconds {
+        if !(rtl || playback) {
+            return Err("--soak needs --rtl or --file so it measures a real source".into());
+        }
+        if !seconds.is_finite() || seconds < 60.0 {
+            return Err("--soak needs at least 60 seconds to be a meaningful trend".into());
+        }
+        if !soak_interval.is_finite() || !(1.0..=60.0).contains(&soak_interval) {
+            return Err("--soak-interval must be between 1 and 60 seconds".into());
+        }
+        if arguments.iter().any(|a| a.contains("smoke")) {
+            return Err("--soak cannot be combined with a smoke test".into());
+        }
+    }
     let center_mhz = file_center.unwrap_or(106_950_000) as f64 / 1e6;
     let mut initial = Display::default();
     let settings_smoke = arguments
@@ -128,9 +151,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Settings smoke requires an isolated RUSTSDR_CONFIG_DIR".into());
     }
     let testing = !settings_smoke
-        && arguments
-            .iter()
-            .any(|arg| arg.starts_with("--") && arg.contains("smoke"));
+        && (arguments.iter().any(|arg| arg == "--soak")
+            || arguments
+                .iter()
+                .any(|arg| arg.starts_with("--") && arg.contains("smoke")));
     let persistence = if testing {
         None
     } else {
@@ -362,6 +386,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .before(bevy_egui::EguiPreUpdateSet::BeginPass),
         );
     }
+    if let Some(seconds) = soak_seconds {
+        let source_label = if rtl { "rtl-sdr" } else { "file" };
+        app.insert_resource(soak::Soak::new(seconds, soak_interval, source_label))
+            .add_systems(
+                PreUpdate,
+                soak::run
+                    .after(bevy_egui::EguiPreUpdateSet::ProcessInput)
+                    .before(bevy_egui::EguiPreUpdateSet::BeginPass),
+            );
+    }
     let outcome = app.run();
     if outcome.is_success() {
         Ok(())
@@ -385,6 +419,9 @@ fn setup_view(world: &mut World) -> bevy::prelude::Result {
     world.spawn(Camera2d);
     if let Some(mut smoke) = world.get_resource_mut::<SmokeTest>() {
         smoke.started = std::time::Instant::now();
+    }
+    if let Some(mut soak) = world.get_resource_mut::<soak::Soak>() {
+        soak.start();
     }
     Ok(())
 }
@@ -714,6 +751,7 @@ struct Display {
     texture_axis: Option<(f64, f64)>,
     drag_axis: Option<(f64, f64)>,
     fit_position: Option<egui::Pos2>,
+    full_span_position: Option<egui::Pos2>,
     file_path: String,
     file_center_mhz: f64,
     running: bool,
@@ -774,6 +812,7 @@ impl Default for Display {
             texture_axis: None,
             drag_axis: None,
             fit_position: None,
+            full_span_position: None,
             file_path: String::new(),
             file_center_mhz: 106.95,
             running: true,
@@ -884,7 +923,6 @@ impl Display {
         self.history.fill(-140.0);
         self.next_row = 0;
         self.last_sequence = 0;
-        self.texture = None;
         self.row_centers.fill(0.0);
         self.row_spans.fill(SAMPLE_RATE as f64);
         self.labels.clear();
@@ -916,7 +954,7 @@ impl Display {
         self.cursor_hz = tuning.station_hz as f64 - self.center_hz();
         if self.center_hz() != old_center {
             self.spectrum.fill(-140.0);
-            self.texture = None; // Reproject retained rows onto the new frequency axis.
+            self.texture_axis = None; // Reproject retained rows onto the new frequency axis.
         }
         self.revision += 1;
         self.pending = true;
@@ -994,7 +1032,9 @@ impl Display {
         self.texture_axis = Some((center, span));
         let image = egui::ColorImage::new([WATERFALL_WIDTH, HISTORY], colors);
         if let Some(texture) = &mut self.texture {
-            texture.set(image, egui::TextureOptions::NEAREST);
+            // Keep the Bevy image asset instead of creating a new one for every
+            // zoom, retune or restart. The waterfall dimensions stay fixed.
+            texture.set_partial([0, 0], image, egui::TextureOptions::NEAREST);
         } else {
             self.texture =
                 Some(context.load_texture("waterfall", image, egui::TextureOptions::NEAREST));
@@ -1067,7 +1107,7 @@ fn draw(
         if !display.pending && update.revision == display.revision && display.scan_plan.is_some() {
             if update.center_hz != display.center_hz().round() as u64 {
                 display.spectrum.fill(-140.0);
-                display.texture = None;
+                display.texture_axis = None;
             }
             display.station_mhz = update.station_hz as f64 / 1e6;
             if display.source == Source::RtlSdr {
@@ -1191,7 +1231,7 @@ fn draw(
             display.reset();
         } else if before.center_hz() != after.center_hz() {
             display.spectrum.fill(-140.0);
-            display.texture = None;
+            display.texture_axis = None;
         }
     }
     if display.pending {

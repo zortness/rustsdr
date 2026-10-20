@@ -12,6 +12,8 @@ Gate: known signals display and demodulate correctly; playback stays bounded dur
 
 Select equipment and implement one adapter with discovery, tuning, gain, sample-rate selection, and disconnect/reconnect handling. Keep manufacturer-specific libraries inside the adapter. Add audio-clock drift handling and long-run diagnostics.
 
+Status: live RTL-SDR tuning, one user-confirmed reconnect, repeated software restart cycles and four instrumented 30-minute runs are recorded. Three Vulkan runs failed the memory gate; a Direct3D 12 run passed it on the named AMD/Windows host. Repeated physical recovery, device selection and adjustable gain/sample rate remain open. Track each gate in the [M02 brief](milestone-02.md) and [soak record](soak-results.md).
+
 Gate: sustained live reception, repeated lifecycle transitions, and sample-rate changes work on the named test equipment. Report overflows and audio underruns with measured results. Capture device, driver, OS, and build details.
 
 ## M03: Daily-use single receiver
