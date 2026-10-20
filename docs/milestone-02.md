@@ -1,6 +1,6 @@
 # M02: First live radio
 
-Status: in progress. Live reception arrived before M01's acceptance record. Three [instrumented 30-minute Vulkan runs](soak-results.md) measured working reception and repeated software recovery but failed the memory gate. A fourth 30-minute run with Direct3D 12 collected counters across restarts every GUI frame and passed the resource and host-loss gates on the named AMD/Windows host. Device selection, gain/sample-rate control, and repeated physical reconnect still block the M02 gate in the [roadmap](roadmap.md).
+Status: in progress. Live reception arrived before M01's acceptance record; M01 is now accepted for its documented Direct3D 12 configuration. Three [instrumented 30-minute Vulkan runs](soak-results.md) measured working reception and repeated software recovery but failed the memory gate. A fourth 30-minute run with Direct3D 12 collected counters across restarts every GUI frame and passed the resource and host-loss gates on the named AMD/Windows host. Device selection, gain/sample-rate control, and repeated physical reconnect still block the M02 gate in the [roadmap](roadmap.md).
 
 ## Current equipment and behavior
 

@@ -1,12 +1,14 @@
 # Roadmap
 
-Audience: contributors selecting the next increment. Milestones describe observable outcomes rather than calendar estimates. M01 is in progress; no full milestone is complete yet. See the [implementation status](implementation-status.md).
+Audience: contributors selecting the next increment. Milestones describe observable outcomes rather than calendar estimates. M01 is complete for its documented Direct3D 12 acceptance configuration on the named Windows host; M02 remains in progress. See the [implementation status](implementation-status.md).
 
 ## M01: File-backed receiver and rendering foundation
 
 Build synthetic and file input, a Bevy spectrum/waterfall, one tunable receiver, mono broadcast-FM demodulation, and speaker audio. Establish bounded buffering, shutdown, diagnostics, and headless DSP tests.
 
 Gate: known signals display and demodulate correctly; playback stays bounded during UI interaction; acceptance evidence in the [first-milestone brief](milestone-01.md) is recorded.
+
+Status: accepted on 2026-10-19 with the Direct3D 12 backend and a separate live audio-output recovery check. Default Vulkan still fails the memory trend on the test host; that limitation is recorded in the [soak results](soak-results.md).
 
 ## M02: First live radio
 
@@ -18,7 +20,7 @@ Gate: sustained live reception, repeated lifecycle transitions, and sample-rate 
 
 ## M03: Daily-use single receiver
 
-The user completed a 30-minute manual multi-mode stability test. Current priority: modular receiver controls and results panels, followed by RDS/RBDS text decoding; live AM validation awaits suitable signals or converter support. See [the panel and broadcast-service design](receiver-panels.md). See [receiver modes and optional decoders](receiver-modes.md) and the [mode backlog](mode-backlog.md) for remaining work. Moving this work forward does not waive the earlier milestones' outstanding acceptance gates.
+The user completed a 30-minute manual multi-mode stability test. Current priority: modular receiver controls and results panels, followed by RDS/RBDS text decoding; live AM validation awaits suitable signals or converter support. See [the panel and broadcast-service design](receiver-panels.md). See [receiver modes and optional decoders](receiver-modes.md) and the [mode backlog](mode-backlog.md) for remaining work. Moving this work forward does not waive M02's outstanding acceptance gates.
 
 Add AM, narrow FM, USB/LSB, CW, appropriate AGC/squelch, configurable filters, bookmarks, settings recovery, and audio recording. Expand format support based on real recordings. Add packaging for the initial platform.
 

@@ -1,0 +1,22 @@
+Local date: 2026-10-19 (America/Los_Angeles)
+Host and receiver: Windows 11 Pro, RTL-SDR v3/R820T, Rust RTL backend
+Audio interface: BEHRINGER UMC202HD; power toggled separately from the RTL-SDR
+Build: cargo build -p sdr-app --example audio_recovery_probe --release --features desktop --offline
+Command: .\target\release\examples\audio_recovery_probe.exe BEHRINGER --hot
+
+The probe began with BEHRINGER as the default playback output. It verified a
+running receiver, spectrum frames, and an audio queue before the user powered
+the interface off. Windows had selected ROG headphones as a fallback in a
+prior attempt, so this run tested failure of the already-open BEHRINGER stream.
+
+BASELINE: samples=4014080 output=Speakers (BEHRINGER UMC202HD 192k); power it off now
+UNAVAILABLE: receiver running, samples 67207168 -> 74416128, audio_error=Some("Audio output disconnected or failed; stop/start to retry"), iq_drops=0
+STOPPED: revision 2
+RECOVERED: revision 3 samples=4014080 output=Speakers (BEHRINGER UMC202HD 192k) rate=Some(48000) queue=Some(2047) audio_rms=0.2152 iq_drops=0
+PASS: unavailable output and same-process stop/start recovery
+Process exit code: 0
+
+The probe observed an active output failure and recovery in one controller
+process. It did not test startup with no default playback endpoint, because
+Windows selected another endpoint when BEHRINGER was unavailable, and it did
+not establish audible quality after recovery.
