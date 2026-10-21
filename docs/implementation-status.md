@@ -2,6 +2,8 @@
 
 Updated: 2026-10-20. M01 and M02 are accepted for their documented Direct3D 12 configuration on the named Windows host. Live RTL-SDR integration was brought forward after the user connected a dongle. Sections below retain their original checkpoint dates, so earlier statements about pending tests describe those earlier checkpoints.
 
+M03 acceptance is tracked in the [M03 checklist](milestone-03.md). Decoded receiver audio can now be saved as 48 kHz stereo PCM WAV through the GUI, with a temporary file and explicit queue-loss/file-error handling. A receiver-to-file test verifies a playable WAV through `ffprobe`. A local Windows ZIP packaging script stages the desktop executable and native RTL runtime. GUI recording behavior, a clean-environment package test, live AM, and a measured all-mode session still need acceptance evidence.
+
 ## M02 closure (2026-10-20)
 
 The desktop UI now discovers RTL devices and persists a selected index and USB serial. Both adapters validate the requested tuner gain against the connected tuner's list and accept 1.92 or 2.4 MS/s with rate readback. The live DSP, FFT, IQ metadata and VFO limit follow the selected rate; file and synthetic input retain 2.4 MS/s. Live probes on the RTL-SDR v3/R820T passed 2.4/28.0 → 1.92/32.8 → 2.4/28.0 on Rust and native backends with fresh audio/spectrum revisions and zero reported host IQ drops. Three physical unplug/reconnect cycles resumed Rust reception in one process. Windows reported WinUSB/libwdi `oem169.inf`, version `6.1.7600.16385`, on the tuner interface. See the [M02 acceptance brief](milestone-02.md). Simultaneous selection between two physical dongles was not tested.

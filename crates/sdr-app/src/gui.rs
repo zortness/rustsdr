@@ -8,6 +8,7 @@ use sdr_app::engine::{
     Client, Command, Engine, FFT_SIZE, FileSettings, RTL_OFFSET_HZ, SAMPLE_RATE, Settings, Source,
     SubmitError, Update as RadioUpdate,
 };
+use sdr_app::recording::Recorder;
 use sdr_app::tuning::Tuning;
 use sdr_devices::RtlBackend;
 use sdr_dsp::{Mode, ReceiverConfig};
@@ -372,6 +373,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             );
     }
     if smoke {
+        std::fs::create_dir_all("target")?;
         app.insert_resource(SmokeTest {
             compact,
             started: std::time::Instant::now(),
@@ -773,6 +775,9 @@ struct Display {
     receiver: ReceiverConfig,
     volume: f32,
     muted: bool,
+    record_path: String,
+    recorder: Option<Recorder>,
+    record_message: Option<String>,
     revision: u64,
     pending: bool,
     status: RadioUpdate,
@@ -841,6 +846,9 @@ impl Default for Display {
             receiver: ReceiverConfig::default(),
             volume: 0.15,
             muted: false,
+            record_path: "recording.wav".into(),
+            recorder: None,
+            record_message: None,
             revision: 1,
             pending: false,
             status: RadioUpdate::default(),
@@ -862,6 +870,16 @@ impl Default for Display {
 }
 
 impl Display {
+    fn finish_recording(&mut self) {
+        if let Some(recorder) = self.recorder.take() {
+            let path = recorder.destination().display().to_string();
+            self.record_message = Some(match recorder.finish() {
+                Ok(frames) => format!("Saved {:.2} s to {path}", frames as f64 / 48_000.0),
+                Err(error) => format!("Recording failed: {error}"),
+            });
+        }
+    }
+
     fn capture_rate(&self) -> u32 {
         if self.source == Source::RtlSdr {
             self.rtl_sample_rate
@@ -1214,6 +1232,11 @@ fn draw(
         }
         display.status = update;
     }
+    if display.recorder.as_ref().is_some_and(Recorder::is_finished)
+        || (display.recorder.is_some() && !display.status.running)
+    {
+        display.finish_recording();
+    }
     let mut changed = false;
     if display.source.is_audio_radio() && !context.wants_keyboard_input() {
         let steps = context.input(|i| {
@@ -1248,7 +1271,7 @@ fn draw(
         adapter.as_deref(),
         system.as_deref(),
     );
-    let panel = controls::show(context, &mut display);
+    let panel = controls::show(context, &mut display, controller);
     changed |= panel.0;
     recolor |= panel.1;
     if !display.source.is_audio_radio() {
@@ -1281,6 +1304,9 @@ fn draw(
         display.revision += 1;
         display.pending = true;
         let after = display.settings();
+        if before.source != after.source {
+            display.finish_recording();
+        }
         if before.source != after.source
             || before.rtl_backend != after.rtl_backend
             || before.rtl_device_index != after.rtl_device_index

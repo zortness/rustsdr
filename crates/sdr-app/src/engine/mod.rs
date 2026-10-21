@@ -231,6 +231,10 @@ impl Client {
     pub fn subscribe_audio(&self) -> EventStream<AudioBlock> {
         self.latest.subscribe_audio()
     }
+    /// Monitor signal after scanning's audio gate, before speaker gain/mute.
+    pub fn subscribe_monitor_audio(&self) -> EventStream<AudioBlock> {
+        self.latest.subscribe_monitor_audio()
+    }
     pub fn set_volume(&self, gain: f32) {
         if gain.is_finite() {
             self.volume

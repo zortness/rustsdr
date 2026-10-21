@@ -57,6 +57,15 @@ pub fn library_path() -> PathBuf {
     }
     #[cfg(windows)]
     {
+        // A packaged application keeps the native runtime beside its executable.
+        if let Ok(executable) = std::env::current_exe()
+            && let Some(directory) = executable.parent()
+        {
+            let packaged = directory.join("rtlsdr.dll");
+            if packaged.exists() {
+                return packaged;
+            }
+        }
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let bundled = root.join("third-party/rtl-sdr-blog-v1.4.0/runtime/x64/rtlsdr.dll");
         if bundled.exists() {

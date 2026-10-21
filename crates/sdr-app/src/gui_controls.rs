@@ -249,26 +249,30 @@ pub(super) fn header(
     });
     changed
 }
-pub(super) fn show(context: &egui::Context, display: &mut Display) -> (bool, bool) {
+pub(super) fn show(
+    context: &egui::Context,
+    display: &mut Display,
+    controller: &Client,
+) -> (bool, bool) {
     let mut result = (false, false);
     if context.content_rect().width() >= 760.0 {
         egui::SidePanel::left("controls")
             .default_width(235.0)
             .width_range(220.0..=400.0)
             .resizable(true)
-            .show(context, |ui| result = contents(ui, display));
+            .show(context, |ui| result = contents(ui, display, controller));
     } else {
         let mut open = display.controls_open;
         egui::Window::new("Controls")
             .open(&mut open)
             .default_width(235.0)
             .max_height((context.content_rect().height() - 140.0).max(150.0))
-            .show(context, |ui| result = contents(ui, display));
+            .show(context, |ui| result = contents(ui, display, controller));
         display.controls_open = open;
     }
     result
 }
-fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
+fn contents(ui: &mut egui::Ui, display: &mut Display, controller: &Client) -> (bool, bool) {
     let mut changed = false;
     let mut recolor = false;
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -292,6 +296,28 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
         if display.source != Source::Synthetic {
             ui.add(egui::Slider::new(&mut display.volume, 0.0..=1.0).text("Volume"));
             ui.checkbox(&mut display.muted, "Mute");
+        }
+        if matches!(display.source, Source::RtlSdr | Source::File) {
+            ui.label("Decoded audio WAV (48 kHz stereo)");
+            ui.add(egui::TextEdit::singleline(&mut display.record_path).hint_text("recording.wav"));
+            if display.recorder.is_some() {
+                if ui.button("Stop recording").clicked() {
+                    display.finish_recording();
+                }
+            } else if ui.add_enabled(display.status.running, egui::Button::new("Record audio")).clicked() {
+                display.record_message = None;
+                match sdr_app::recording::Recorder::start(
+                    controller,
+                    std::path::PathBuf::from(display.record_path.trim()),
+                ) {
+                    Ok(recorder) => display.recorder = Some(recorder),
+                    Err(error) => display.record_message = Some(format!("Recording failed: {error}")),
+                }
+            }
+            ui.small("Before speaker volume/mute; reception and mode changes continue in one file.");
+            if let Some(message) = &display.record_message {
+                ui.label(message);
+            }
         }
         ui.add_space(12.0);
         if display.source == Source::Ic705 {

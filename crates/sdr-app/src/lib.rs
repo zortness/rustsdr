@@ -10,6 +10,7 @@ pub mod practice;
 #[cfg(feature = "midi")]
 pub mod practice_midi;
 pub mod preferences;
+pub mod recording;
 pub mod scanning;
 pub mod spectrum_view;
 #[cfg(feature = "sstv")]

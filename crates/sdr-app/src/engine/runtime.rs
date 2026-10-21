@@ -412,6 +412,14 @@ fn run_live(
         if scanner.is_some() && scan_status.phase != ScanPhase::Holding {
             audio_samples.fill(sdr_dsp::StereoFrame::default());
         }
+        output.publish_monitor_audio(
+            settings.revision,
+            capture_revision,
+            sample_index,
+            audio_index - audio_samples.len() as u64,
+            discontinuity,
+            &audio_samples,
+        );
         #[cfg(feature = "audio")]
         if let Some(stream) = &mut audio {
             stream.push(&audio_samples);

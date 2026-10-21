@@ -95,7 +95,7 @@ cargo run -p sdr-app --features desktop --offline -- --gui --smoke-test
 
 The smoke test opens a temporary window, exercises stop/start, cursor interaction and resizing, saves a screenshot in the build output directory, and exits automatically. It requires a graphical desktop.
 
-Next are device/audio recovery checks and longer reception/performance validation. See the [implementation status](docs/implementation-status.md) for evidence, limitations, and the continuation point.
+M01 and M02 reception and recovery checks are recorded in the [implementation status](docs/implementation-status.md). The [M03 checklist](docs/milestone-03.md) tracks the current acceptance work.
 
 ## Listen with the RTL-SDR v3
 
@@ -168,6 +168,14 @@ Playback follows sample time with fixed-size buffers. EOF drains queued audio, s
 
 Add `--smoke-test` to the playback command to exercise stop/start, EOF, and resizing and save `target/file-smoke.png`. The smoke fixture must be long enough to deliver spectrum rows before its scripted stop (the generated two-second recording meets this requirement).
 
+## Record decoded audio
+
+With RTL-SDR or IQ-file reception running, enter a new `.wav` path in **Reception** and press **Record audio**. Press **Stop recording** to finish it. The file is 48 kHz stereo, 16-bit PCM, including mono listening modes as equal left/right channels. Recording taps the decoded monitor signal after the scan audio gate and before speaker volume and mute, so muting the speakers does not mute the file. A mode change or retune continues in the same file without inserting wall-clock silence; stopping reception or changing sources finishes it. The path must be writable and must not already exist. A `.wav.part` file is used during recording and removed if writing fails; the final `.wav` appears after a successful finish. The UI reports a queue overflow or file error instead of silently delivering an incomplete recording.
+
+## Local Windows package candidate
+
+Run `./scripts/package-windows.ps1` to build and stage a versioned Windows x64 ZIP under `target/dist/`. It includes the desktop executable, the three native RTL runtime DLLs, and `Launch-RustSDR.cmd`, which starts the app with the documented Direct3D 12 renderer. This is a local acceptance artifact pending clean-environment installation and redistribution review; see [M03](docs/milestone-03.md).
+
 ## Listening modes
 
 For frame/thread timelines, see [Perfetto trace capture](docs/profiling.md). Build with `--features perfetto`, set `TRACE_CHROME` to a JSON output path, reproduce a short scenario, and close normally before opening the file in Perfetto.
@@ -193,7 +201,7 @@ Launch directly into stereo reception:
 cargo run -p sdr-app --features desktop -- --gui --rtl --mode stereo
 ```
 
-Live frequency policy is currently **28.8–1700 MHz**, device 0, 28 dB gain, and 2.4 MS/s. Actual coverage depends on the tuner. V3 HF direct sampling is **not enabled**; HF AM/SSB can be exercised through IQ recordings. An appropriate antenna and adapter support are still needed for live HF.
+Live frequency policy is currently **28.8–1700 MHz** without a converter. Select a discovered RTL device, 1.92 or 2.4 MS/s, and a tuner-supported gain in the GUI; defaults remain the first device, 2.4 MS/s, and 28 dB. Actual coverage depends on the tuner. V3 HF direct sampling is **not enabled**; HF AM/SSB can be exercised through IQ recordings or a configured external converter with a suitable antenna.
 
 Generate a stereo listening fixture (1 kHz left, 2 kHz right), or substitute `am`, `nfm`, `usb`, `lsb`, or `wfm` in both commands:
 

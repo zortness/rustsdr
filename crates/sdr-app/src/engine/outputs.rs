@@ -75,6 +75,7 @@ pub(super) struct Outputs {
     state: Mutex<Update>,
     pub events: EventStream<EngineEvent>,
     audio: Broadcast<AudioBlock>,
+    monitor_audio: Broadcast<AudioBlock>,
     pub iq: Broadcast<super::IqBlock>,
 }
 impl Default for Outputs {
@@ -83,6 +84,7 @@ impl Default for Outputs {
             state: Mutex::default(),
             events: EventStream::bounded(64),
             audio: Broadcast::default(),
+            monitor_audio: Broadcast::default(),
             iq: Broadcast::default(),
         }
     }
@@ -99,6 +101,9 @@ impl Outputs {
     pub fn subscribe_audio(&self) -> EventStream<AudioBlock> {
         self.audio.subscribe()
     }
+    pub fn subscribe_monitor_audio(&self) -> EventStream<AudioBlock> {
+        self.monitor_audio.subscribe()
+    }
     pub fn publish_audio(
         &self,
         revision: u64,
@@ -108,7 +113,45 @@ impl Outputs {
         discontinuity: u64,
         frames: &[StereoFrame],
     ) {
-        self.audio.publish(|| AudioBlock {
+        Self::publish_audio_to(
+            &self.audio,
+            revision,
+            capture_revision,
+            input_start,
+            output_start,
+            discontinuity,
+            frames,
+        );
+    }
+    pub fn publish_monitor_audio(
+        &self,
+        revision: u64,
+        capture_revision: u64,
+        input_start: u64,
+        output_start: u64,
+        discontinuity: u64,
+        frames: &[StereoFrame],
+    ) {
+        Self::publish_audio_to(
+            &self.monitor_audio,
+            revision,
+            capture_revision,
+            input_start,
+            output_start,
+            discontinuity,
+            frames,
+        );
+    }
+    fn publish_audio_to(
+        stream: &Broadcast<AudioBlock>,
+        revision: u64,
+        capture_revision: u64,
+        input_start: u64,
+        output_start: u64,
+        discontinuity: u64,
+        frames: &[StereoFrame],
+    ) {
+        stream.publish(|| AudioBlock {
             end_time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default(),
@@ -171,5 +214,28 @@ mod tests {
         assert_eq!(fast.dropped(), 0);
         assert_eq!(slow.dropped(), 4);
         assert_eq!(slow.next().unwrap().output_start, 0);
+    }
+
+    #[test]
+    fn monitor_audio_is_independent_of_decoder_audio() {
+        let outputs = Outputs::default();
+        let decoder = outputs.subscribe_audio();
+        let monitor = outputs.subscribe_monitor_audio();
+        outputs.publish_audio(
+            1,
+            1,
+            0,
+            0,
+            0,
+            &[StereoFrame {
+                left: 0.5,
+                right: 0.5,
+            }],
+        );
+        outputs.publish_monitor_audio(1, 1, 0, 0, 0, &[StereoFrame::default()]);
+        assert_eq!(decoder.next().unwrap().frames[0].left, 0.5);
+        assert_eq!(monitor.next().unwrap().frames[0].left, 0.0);
+        assert!(decoder.next().is_none());
+        assert!(monitor.next().is_none());
     }
 }

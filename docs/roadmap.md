@@ -20,9 +20,9 @@ Gate: sustained live reception, repeated lifecycle transitions, and sample-rate 
 
 ## M03: Daily-use single receiver
 
-The user completed a 30-minute manual multi-mode stability test. Current priority: modular receiver controls and results panels, followed by RDS/RBDS text decoding; live AM validation awaits suitable signals or converter support. See [the panel and broadcast-service design](receiver-panels.md). See [receiver modes and optional decoders](receiver-modes.md) and the [mode backlog](mode-backlog.md) for remaining work.
+Status: in progress. The seven listening modes, modular controls, RDS/RBDS results, memories/scanning, and persistent settings are implemented. Decoded WAV recording and a local Windows package candidate are implemented but still need the acceptance checks in the [M03 brief](milestone-03.md). A 30-minute manual multi-mode session is recorded; live AM validation and a measured mode-coverage session remain open. See the [receiver modes](receiver-modes.md) and [mode backlog](mode-backlog.md) for related work.
 
-Add AM, narrow FM, USB/LSB, CW, appropriate AGC/squelch, configurable filters, bookmarks, settings recovery, and audio recording. Expand format support based on real recordings. Add packaging for the initial platform.
+Outcome: one receiver supports AM, narrow FM, USB/LSB, CW and broadcast FM with suitable AGC/squelch and filters, reusable memories and settings, decoded audio recording, and an installable package for the initial platform. Expand input formats when real recordings require them.
 
 Gate: each supported mode has signal fixtures and documented behavior; recording and configuration failures are recoverable; a new user can install and receive without developer tooling.
 
