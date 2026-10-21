@@ -77,9 +77,9 @@ Update this record when a default becomes a measured decision or a requirement c
 
 The user supplied an RTL-SDR v3 USB dongle with a small VHF antenna. Windows enumerated the device as VID 0BDA / PID 2838. Interface 0 initially had no driver reported; a subsequent device-property check reported the WinUSB service and problem code 0. This verifies enumeration and driver binding, not successful IQ reception.
 
-The RTL-SDR adapter and mono FM/audio path are now implemented. The user suggested 106.7 MHz and 89.9 MHz in the 88–108 MHz band. Both completed short live reception/audio probes at 2.4 MS/s with zero reported host IQ drops or audio underruns/overruns. On 2026-09-24, the user confirmed clear audio on multiple stations, working controls, correct-looking FFT/waterfall displays, and working waterfall display-limit adjustments. Sustained performance remains unverified.
+The RTL-SDR adapter and mono FM/audio path are now implemented. The user suggested 106.7 MHz and 89.9 MHz in the 88–108 MHz band. Both completed short live reception/audio probes at 2.4 MS/s with zero reported host IQ drops or audio underruns/overruns. On 2026-09-24, the user confirmed clear audio on multiple stations, working controls, correct-looking FFT/waterfall displays, and working waterfall display-limit adjustments. Sustained performance was verified later in the [M02 acceptance record](milestone-02.md).
 
-Defaults are device index 0, manual 28 dB RF gain, nominal 200 kHz channel, capture center 250 kHz above the station, and 75 microsecond de-emphasis (50 selectable). The supplied DLL is x86; the x64 app uses a separately installed official RTL-SDR Blog V1.4.0 runtime, preserving the original. See [runtime provenance](../third-party/README.md). General device capabilities, selectable gains/rates, and distribution packaging remain later work.
+Defaults are device index 0, manual 28 dB RF gain, nominal 200 kHz channel, capture center 250 kHz above the station, and 75 microsecond de-emphasis (50 selectable). The supplied DLL is x86; the x64 app uses a separately installed official RTL-SDR Blog V1.4.0 runtime, preserving the original. See [runtime provenance](../third-party/README.md). Device discovery, gain and 1.92/2.4 MS/s selection were added for M02; broader device capabilities and distribution packaging remain later work.
 
 ## Next receive modes
 

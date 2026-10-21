@@ -37,10 +37,12 @@ fn run_live(
         tune_scan(settings, scan.current());
     }
     let mut advance = false;
+    let capture_rate = settings.capture_rate();
     let mut offset_hz = settings.station_hz as f64 - settings.center_hz() as f64;
-    let mut receiver = Receiver::new(offset_hz, settings.receiver).map_err(str::to_owned)?;
+    let mut receiver = Receiver::with_input_rate(capture_rate, offset_hz, settings.receiver)
+        .map_err(str::to_owned)?;
     let mut fft =
-        ZoomSpectrum::new(SAMPLE_RATE as f64, settings.spectrum_view).map_err(str::to_owned)?;
+        ZoomSpectrum::new(capture_rate as f64, settings.spectrum_view).map_err(str::to_owned)?;
     let mut spectrum_row = 0;
     let mut audio_samples = Vec::with_capacity(1024);
     let mut multiplex = Vec::with_capacity(1639);
@@ -72,13 +74,15 @@ fn run_live(
         None
     };
     let mut radio = if file.is_none() {
-        Some(RtlSession::open_with(
+        Some(RtlSession::open_configured(
             settings.rtl_backend,
-            0,
+            settings.rtl_device_index,
+            settings.rtl_device_serial.as_deref(),
             settings
                 .tuner_center_hz()
                 .ok_or("Invalid converted tuner frequency")?,
-            SAMPLE_RATE,
+            capture_rate,
+            settings.rtl_gain_tenth_db,
         )?)
     } else {
         None
@@ -140,6 +144,10 @@ fn run_live(
             if !request.running
                 || request.source != settings.source
                 || request.rtl_backend != settings.rtl_backend
+                || request.rtl_device_index != settings.rtl_device_index
+                || request.rtl_device_serial != settings.rtl_device_serial
+                || request.rtl_sample_rate != settings.rtl_sample_rate
+                || request.rtl_gain_tenth_db != settings.rtl_gain_tenth_db
                 || request.file != settings.file
                 || request.converter_offset_hz != settings.converter_offset_hz
             {
@@ -179,9 +187,10 @@ fn run_live(
                 )?;
             }
             if receiver_changed {
-                fft = ZoomSpectrum::new(SAMPLE_RATE as f64, request.spectrum_view)
+                fft = ZoomSpectrum::new(capture_rate as f64, request.spectrum_view)
                     .map_err(str::to_owned)?;
-                receiver = Receiver::new(new_offset, request.receiver).map_err(str::to_owned)?;
+                receiver = Receiver::with_input_rate(capture_rate, new_offset, request.receiver)
+                    .map_err(str::to_owned)?;
                 discontinuity += 1;
                 audio_index = 0;
             }
@@ -295,7 +304,7 @@ fn run_live(
             (block.sample_index, block.samples().len())
         };
         if sample_index != expected {
-            fft = ZoomSpectrum::new(SAMPLE_RATE as f64, settings.spectrum_view)
+            fft = ZoomSpectrum::new(capture_rate as f64, settings.spectrum_view)
                 .map_err(str::to_owned)?;
             if let Some(scan) = &mut scanner {
                 scan.tuned(clock.elapsed());
@@ -306,7 +315,8 @@ fn run_live(
             if let Some(stream) = &mut audio {
                 stream.retune();
             }
-            receiver = Receiver::new(offset_hz, settings.receiver).map_err(str::to_owned)?;
+            receiver = Receiver::with_input_rate(capture_rate, offset_hz, settings.receiver)
+                .map_err(str::to_owned)?;
             rds = new_rds(settings);
             cw = new_cw(settings);
             output.lock().map_err(|_| "display lock poisoned")?.cw = None;
@@ -318,7 +328,7 @@ fn run_live(
             discontinuity,
             input_start: sample_index,
             output_start: sample_index,
-            sample_rate: SAMPLE_RATE,
+            sample_rate: capture_rate,
             center_hz: settings.center_hz(),
             station_hz: settings.station_hz as u64,
             end_time: std::time::SystemTime::now()
@@ -407,7 +417,7 @@ fn run_live(
             stream.push(&audio_samples);
         }
         if fft.view() != settings.spectrum_view {
-            fft = ZoomSpectrum::new(SAMPLE_RATE as f64, settings.spectrum_view)
+            fft = ZoomSpectrum::new(capture_rate as f64, settings.spectrum_view)
                 .map_err(str::to_owned)?;
         }
         let analysis_rate_hz = fft.sample_rate();
@@ -644,7 +654,12 @@ fn tune_scan(settings: &mut Settings, channel: crate::scanning::ScanChannel) {
         station_hz: settings.station_hz,
         center_hz: settings.center_hz() as u32,
     };
-    tuning.tune(channel.frequency_hz, 1, settings.source == Source::File);
+    tuning.tune_with_limit(
+        channel.frequency_hz,
+        1,
+        settings.source == Source::File,
+        settings.capture_rate() / 2 - 200_000,
+    );
     settings.station_hz = tuning.station_hz;
     if settings.source == Source::RtlSdr {
         settings.rtl_center_hz = Some(tuning.center_hz);

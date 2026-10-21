@@ -24,6 +24,9 @@ pub fn tuner_frequency(rf: u64, offset: i64) -> Option<u32> {
 
 impl Tuning {
     pub fn tune(&mut self, hz: u32, step: u32, fixed_capture: bool) {
+        self.tune_with_limit(hz, step, fixed_capture, 1_000_000);
+    }
+    pub fn tune_with_limit(&mut self, hz: u32, step: u32, fixed_capture: bool, max_offset_hz: u32) {
         let step = step.max(1) as u64;
         let (minimum, maximum) = if fixed_capture {
             (sdr_core::FILE_MIN_HZ, sdr_core::RX_MAX_HZ)
@@ -42,7 +45,7 @@ impl Tuning {
             );
         } else {
             self.station_hz = hz;
-            if hz.abs_diff(self.center_hz) > 1_000_000
+            if hz.abs_diff(self.center_hz) > max_offset_hz
                 || !(minimum..=maximum).contains(&self.center_hz)
             {
                 self.center_hz = (hz + 250_000).min(maximum);

@@ -173,7 +173,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             center_hz: initial.rtl_center_hz,
             station_hz: (initial.station_mhz * 1e6).round() as u32,
         };
-        tuning.tune(tuning.station_hz, 1, false);
+        tuning.tune_with_limit(
+            tuning.station_hz,
+            1,
+            false,
+            initial.rtl_sample_rate / 2 - 200_000,
+        );
         initial.station_mhz = tuning.station_hz as f64 / 1e6;
         initial.rtl_center_hz = tuning.center_hz;
     }
@@ -739,6 +744,13 @@ struct Display {
     source_button_position: Option<egui::Pos2>,
     rtl_backend_positions: [Option<egui::Pos2>; 2],
     rtl_backend: RtlBackend,
+    rtl_device_index: u32,
+    rtl_device_serial: Option<String>,
+    rtl_devices: Vec<sdr_devices::RtlDevice>,
+    rtl_devices_scanned: bool,
+    rtl_device_error: Option<String>,
+    rtl_sample_rate: u32,
+    rtl_gain_tenth_db: i32,
     rtl_center_hz: u32,
     tune_step_hz: u32,
     wheel_remainder: f32,
@@ -800,6 +812,13 @@ impl Default for Display {
             source_button_position: None,
             rtl_backend_positions: [None; 2],
             rtl_backend: RtlBackend::default(),
+            rtl_device_index: 0,
+            rtl_device_serial: None,
+            rtl_devices: Vec::new(),
+            rtl_devices_scanned: false,
+            rtl_device_error: None,
+            rtl_sample_rate: SAMPLE_RATE,
+            rtl_gain_tenth_db: 280,
             rtl_center_hz: 106_950_000,
             tune_step_hz: 100_000,
             wheel_remainder: 0.0,
@@ -843,19 +862,49 @@ impl Default for Display {
 }
 
 impl Display {
+    fn capture_rate(&self) -> u32 {
+        if self.source == Source::RtlSdr {
+            self.rtl_sample_rate
+        } else {
+            SAMPLE_RATE
+        }
+    }
+    fn vfo_limit(&self) -> u32 {
+        self.capture_rate() / 2 - 200_000
+    }
+    fn refresh_rtl_devices(&mut self) {
+        self.rtl_devices_scanned = true;
+        #[cfg(feature = "rtl")]
+        match sdr_devices::rtl::discover(self.rtl_backend) {
+            Ok(devices) => {
+                self.rtl_devices = devices;
+                self.rtl_device_error = None;
+            }
+            Err(error) => {
+                self.rtl_devices.clear();
+                self.rtl_device_error = Some(error);
+            }
+        }
+        #[cfg(not(feature = "rtl"))]
+        {
+            self.rtl_devices.clear();
+            self.rtl_device_error = Some("RTL support was not compiled in".into());
+        }
+    }
     fn spectrum_view(&self) -> sdr_dsp::zoom_spectrum::SpectrumView {
         use sdr_dsp::zoom_spectrum::SpectrumView;
         if self.source.is_audio_radio() {
             return SpectrumView::full(SAMPLE_RATE as f64);
         }
-        let span = (SAMPLE_RATE as f64 / self.zoom as f64).clamp(500.0, SAMPLE_RATE as f64);
+        let rate = self.capture_rate() as f64;
+        let span = (rate / self.zoom as f64).clamp(500.0, rate);
         let (lo, hi) = self.receiver.passband();
         let desired = if self.source == Source::Synthetic {
             self.tone_hz
         } else {
             self.station_mhz * 1e6 - self.center_hz() + (lo + hi) / 2.0
         };
-        let margin = (SAMPLE_RATE as f64 - span) / 2.0;
+        let margin = (rate - span) / 2.0;
         SpectrumView {
             center_offset_hz: desired.clamp(-margin, margin),
             span_hz: span,
@@ -867,8 +916,9 @@ impl Display {
     }
     fn fit_receiver(&mut self) {
         let (low, high) = self.receiver.passband();
-        self.zoom =
-            (SAMPLE_RATE as f64 / ((high - low) * 1.4).clamp(500.0, SAMPLE_RATE as f64)) as f32;
+        self.zoom = (self.capture_rate() as f64
+            / ((high - low) * 1.4).clamp(500.0, self.capture_rate() as f64))
+            as f32;
     }
     fn settings(&self) -> Settings {
         Settings {
@@ -889,6 +939,10 @@ impl Display {
             source: self.source,
             station_hz: (self.station_mhz * 1e6).round() as u32,
             rtl_backend: self.rtl_backend,
+            rtl_device_index: self.rtl_device_index,
+            rtl_device_serial: self.rtl_device_serial.clone(),
+            rtl_sample_rate: self.rtl_sample_rate,
+            rtl_gain_tenth_db: self.rtl_gain_tenth_db,
             rtl_center_hz: Some(self.rtl_center_hz),
             receiver: self.receiver,
             file: (self.source == Source::File).then(|| {
@@ -916,7 +970,7 @@ impl Display {
         self.spectrum.resize(FFT_SIZE, -140.0);
         self.spectrum.fill(-140.0);
         self.analysis_center = self.center_hz();
-        self.analysis_rate = SAMPLE_RATE as f64;
+        self.analysis_rate = self.capture_rate() as f64;
         self.received_view = None;
         self.texture_axis = None;
         self.drag_axis = None;
@@ -924,7 +978,8 @@ impl Display {
         self.next_row = 0;
         self.last_sequence = 0;
         self.row_centers.fill(0.0);
-        self.row_spans.fill(SAMPLE_RATE as f64);
+        let capture_rate = self.capture_rate() as f64;
+        self.row_spans.fill(capture_rate);
         self.labels.clear();
     }
 
@@ -1211,7 +1266,12 @@ fn draw(
         display.stop_scan_requested = false;
         if display.source != Source::Synthetic && !display.source.is_audio_radio() {
             let mut t = display.tuning();
-            t.tune(t.station_hz, 1, display.source == Source::File);
+            t.tune_with_limit(
+                t.station_hz,
+                1,
+                display.source == Source::File,
+                display.vfo_limit(),
+            );
             display.station_mhz = t.station_hz as f64 / 1e6;
             if display.source == Source::RtlSdr {
                 display.rtl_center_hz = t.center_hz;
@@ -1223,6 +1283,10 @@ fn draw(
         let after = display.settings();
         if before.source != after.source
             || before.rtl_backend != after.rtl_backend
+            || before.rtl_device_index != after.rtl_device_index
+            || before.rtl_device_serial != after.rtl_device_serial
+            || before.rtl_sample_rate != after.rtl_sample_rate
+            || before.rtl_gain_tenth_db != after.rtl_gain_tenth_db
             || before.running != after.running
             || before.file != after.file
             || before.tone_hz != after.tone_hz
@@ -1411,10 +1475,11 @@ fn inspect(response: &egui::Response, rect: egui::Rect, display: &mut Display) {
             + ((position.x - rect.left()) / rect.width() - 0.5) as f64 * axis.1;
         if display.source != Source::Synthetic && !display.source.is_audio_radio() {
             let mut t = display.tuning();
-            t.tune(
+            t.tune_with_limit(
                 (display.center_hz() + display.cursor_hz).round() as u32,
                 display.tune_step_hz,
                 display.source == Source::File,
+                display.vfo_limit(),
             );
             display.apply_tuning(t);
             display.cursor_hz = display.station_mhz * 1e6 - display.center_hz();
@@ -1453,10 +1518,11 @@ fn inspect(response: &egui::Response, rect: egui::Rect, display: &mut Display) {
             let mut t = display.tuning();
             let delta = steps * display.tune_step_hz as i64;
             if shift || display.source == Source::File {
-                t.tune(
+                t.tune_with_limit(
                     (t.station_hz as i64 + delta).clamp(1, sdr_core::RX_MAX_HZ as i64) as u32,
                     display.tune_step_hz,
                     display.source == Source::File,
+                    display.vfo_limit(),
                 );
             } else {
                 t.pan(delta);
@@ -1474,7 +1540,7 @@ fn cursor(painter: &egui::Painter, rect: egui::Rect, display: &Display) {
         let x = rect.left() + fraction as f32 * rect.width();
         if display.source != Source::Synthetic && !display.source.is_audio_radio() {
             let (low, high) = display.receiver.passband();
-            let scale = display.zoom / SAMPLE_RATE as f32 * rect.width();
+            let scale = display.zoom / display.capture_rate() as f32 * rect.width();
             painter.rect_filled(
                 egui::Rect::from_min_max(
                     egui::pos2(

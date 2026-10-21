@@ -55,6 +55,14 @@ name = "rtl_backend_probe"
 required-features = ["rtl-rust"]
 
 [[example]]
+name = "m02_live_probe"
+required-features = ["rtl-rust"]
+
+[[example]]
+name = "m02_reconnect_probe"
+required-features = ["rtl-rust"]
+
+[[example]]
 name = "audio_recovery_probe"
 required-features = ["rtl-rust", "audio"]
 

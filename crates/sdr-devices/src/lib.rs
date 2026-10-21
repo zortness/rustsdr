@@ -53,4 +53,4 @@ impl ToneSource {
 }
 
 mod rtl_backend;
-pub use rtl_backend::{RtlBackend, RtlInfo};
+pub use rtl_backend::{RtlBackend, RtlDevice, RtlInfo};

@@ -1,6 +1,6 @@
 # Roadmap
 
-Audience: contributors selecting the next increment. Milestones describe observable outcomes rather than calendar estimates. M01 is complete for its documented Direct3D 12 acceptance configuration on the named Windows host; M02 remains in progress. See the [implementation status](implementation-status.md).
+Audience: contributors selecting the next increment. Milestones describe observable outcomes rather than calendar estimates. M01 and M02 are complete for their documented Direct3D 12 acceptance configuration on the named Windows host. See the [implementation status](implementation-status.md).
 
 ## M01: File-backed receiver and rendering foundation
 
@@ -14,13 +14,13 @@ Status: accepted on 2026-10-19 with the Direct3D 12 backend and a separate live 
 
 Select equipment and implement one adapter with discovery, tuning, gain, sample-rate selection, and disconnect/reconnect handling. Keep manufacturer-specific libraries inside the adapter. Add audio-clock drift handling and long-run diagnostics.
 
-Status: live RTL-SDR tuning, one user-confirmed reconnect, repeated software restart cycles and four instrumented 30-minute runs are recorded. Three Vulkan runs failed the memory gate; a Direct3D 12 run passed it on the named AMD/Windows host. Repeated physical recovery, device selection and adjustable gain/sample rate remain open. Track each gate in the [M02 brief](milestone-02.md) and [soak record](soak-results.md).
+Status: accepted on 2026-10-20. A Direct3D 12 30-minute run passed the resource and host-loss gates on the named AMD/Windows host. Device discovery/selection, manual gain and 1.92/2.4 MS/s controls passed software and live checks; three physical reconnect cycles resumed reception in one process. Two physical dongles were not available for a simultaneous selection test. Three earlier Vulkan runs failed the memory gate. See the [M02 brief](milestone-02.md) and [soak record](soak-results.md).
 
 Gate: sustained live reception, repeated lifecycle transitions, and sample-rate changes work on the named test equipment. Report overflows and audio underruns with measured results. Capture device, driver, OS, and build details.
 
 ## M03: Daily-use single receiver
 
-The user completed a 30-minute manual multi-mode stability test. Current priority: modular receiver controls and results panels, followed by RDS/RBDS text decoding; live AM validation awaits suitable signals or converter support. See [the panel and broadcast-service design](receiver-panels.md). See [receiver modes and optional decoders](receiver-modes.md) and the [mode backlog](mode-backlog.md) for remaining work. Moving this work forward does not waive M02's outstanding acceptance gates.
+The user completed a 30-minute manual multi-mode stability test. Current priority: modular receiver controls and results panels, followed by RDS/RBDS text decoding; live AM validation awaits suitable signals or converter support. See [the panel and broadcast-service design](receiver-panels.md). See [receiver modes and optional decoders](receiver-modes.md) and the [mode backlog](mode-backlog.md) for remaining work.
 
 Add AM, narrow FM, USB/LSB, CW, appropriate AGC/squelch, configurable filters, bookmarks, settings recovery, and audio recording. Expand format support based on real recordings. Add packaging for the initial platform.
 

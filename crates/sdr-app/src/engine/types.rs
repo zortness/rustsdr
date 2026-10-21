@@ -70,6 +70,10 @@ pub struct FileSettings {
 #[derive(Clone)]
 pub struct Settings {
     pub rtl_backend: sdr_devices::RtlBackend,
+    pub rtl_device_index: u32,
+    pub rtl_device_serial: Option<String>,
+    pub rtl_sample_rate: u32,
+    pub rtl_gain_tenth_db: i32,
     pub spectrum_view: sdr_dsp::zoom_spectrum::SpectrumView,
     pub converter_offset_hz: i64,
     pub qmx: QmxSettings,
@@ -93,6 +97,10 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rtl_backend: sdr_devices::RtlBackend::default(),
+            rtl_device_index: 0,
+            rtl_device_serial: None,
+            rtl_sample_rate: SAMPLE_RATE,
+            rtl_gain_tenth_db: 280,
             spectrum_view: sdr_dsp::zoom_spectrum::SpectrumView::full(SAMPLE_RATE as f64),
             converter_offset_hz: 0,
             qmx: QmxSettings::default(),
@@ -113,6 +121,13 @@ impl Default for Settings {
     }
 }
 impl Settings {
+    pub fn capture_rate(&self) -> u32 {
+        if self.source == Source::RtlSdr {
+            self.rtl_sample_rate
+        } else {
+            SAMPLE_RATE
+        }
+    }
     pub fn tuner_center_hz(&self) -> Option<u32> {
         crate::tuning::tuner_frequency(self.center_hz(), self.converter_offset_hz)
     }

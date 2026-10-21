@@ -54,9 +54,9 @@ pub fn show(
         ui.separator();
         ui.heading("Reception and audio");
         if let Some(rtl) = &status.rtl {
-            ui.label(rtl.backend.label());
+            ui.label(format!("{} · device {}: {}{}", rtl.backend.label(), rtl.device_index, rtl.device_name, rtl.serial.as_deref().map_or(String::new(), |s| format!(" ({s})"))));
             ui.monospace(format!("Driver configuration: {} Hz | {} samples/s | gain readback {}", rtl.center_hz, rtl.sample_rate, rtl.gain_tenth_db.map_or("unavailable".into(), |gain| format!("{:.1} dB", gain as f32 / 10.0))));
-            ui.small("Requested gain: 28 dB. Frequency/rate readback is not an RF calibration.");
+            ui.small(format!("Requested gain: {:.1} dB. Frequency/rate readback is not an RF calibration.", rtl.requested_gain_tenth_db as f32 / 10.0));
         }
         egui::Grid::new("radio-metrics").num_columns(2).striped(true).show(ui, |ui| {
             for (label,value) in [

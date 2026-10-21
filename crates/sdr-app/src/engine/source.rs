@@ -16,7 +16,14 @@ impl UnavailableBlock {
 }
 #[cfg(not(feature = "rtl"))]
 impl RtlSession {
-    pub fn open_with(_: sdr_devices::RtlBackend, _: u32, _: u32, _: u32) -> Result<Self, String> {
+    pub fn open_configured(
+        _: sdr_devices::RtlBackend,
+        _: u32,
+        _: Option<&str>,
+        _: u32,
+        _: u32,
+        _: i32,
+    ) -> Result<Self, String> {
         Err("RTL support was not compiled in".into())
     }
     pub fn info(&self) -> sdr_devices::RtlInfo {

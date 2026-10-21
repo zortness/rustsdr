@@ -15,12 +15,27 @@ pub(super) struct RustSession {
     stopped: Option<(RtlSdr, Context)>,
 }
 impl RustSession {
-    pub fn open(index: u32, hz: u32, rate: u32) -> Result<(Self, Option<i32>), String> {
-        let mut device = RtlSdr::open(DeviceId::Index(index as usize))
-            .map_err(|e| format!("Rust RTL open: {e}"))?;
+    pub fn open(
+        index: u32,
+        serial: Option<&str>,
+        hz: u32,
+        rate: u32,
+        gain_tenth_db: i32,
+    ) -> Result<(Self, Option<i32>), String> {
+        let id = serial.map_or(DeviceId::Index(index as usize), DeviceId::Serial);
+        let mut device = RtlSdr::open(id).map_err(|e| format!("Rust RTL open: {e}"))?;
         device.set_sample_rate(rate).map_err(|e| e.to_string())?;
         device.set_center_freq(hz).map_err(|e| e.to_string())?;
-        device.set_gain_manual(280).map_err(|e| e.to_string())?;
+        if !device.gains().contains(&gain_tenth_db) {
+            return Err(format!(
+                "Unsupported tuner gain {:.1} dB; available: {:?}",
+                gain_tenth_db as f32 / 10.0,
+                device.gains()
+            ));
+        }
+        device
+            .set_gain_manual(gain_tenth_db)
+            .map_err(|e| e.to_string())?;
         // rs-rtl 0.5 read_gain exposes an encoded register value, not verified dB.
         // Report no gain readback instead of treating that code as a measurement.
         if device.sample_rate() != rate || device.center_freq() != hz {

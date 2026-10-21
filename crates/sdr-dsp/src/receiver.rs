@@ -123,7 +123,7 @@ impl StereoFrame {
     }
 }
 
-/// 2.4 MS/s complex IQ to 48 kHz audio. All filter storage is allocated at construction.
+/// 1.92 or 2.4 MS/s complex IQ to 48 kHz audio.
 pub struct Receiver {
     config: ReceiverConfig,
     rf: Decimator,
@@ -150,9 +150,19 @@ pub struct Receiver {
 }
 impl Receiver {
     pub fn new(offset_hz: f64, config: ReceiverConfig) -> Result<Self, &'static str> {
+        Self::with_input_rate(2_400_000, offset_hz, config)
+    }
+    pub fn with_input_rate(
+        input_rate: u32,
+        offset_hz: f64,
+        config: ReceiverConfig,
+    ) -> Result<Self, &'static str> {
         config.validate()?;
-        if !offset_hz.is_finite() || offset_hz.abs() > 1_000_000.0 {
-            return Err("VFO must lie within +/-1 MHz of capture center");
+        if ![1_920_000, 2_400_000].contains(&input_rate)
+            || !offset_hz.is_finite()
+            || offset_hz.abs() > input_rate as f64 / 2.0 - 200_000.0
+        {
+            return Err("Unsupported input rate or VFO outside capture passband");
         }
         let ssb_center = if config.mode == Mode::Usb {
             300.0 + config.bandwidth_hz as f64 / 2.0
@@ -163,7 +173,12 @@ impl Receiver {
         };
         Ok(Self {
             config,
-            rf: Decimator::new(2_400_000.0, 100_000.0, 241, 10),
+            rf: Decimator::new(
+                input_rate as f64,
+                100_000.0,
+                241,
+                input_rate as usize / 240_000,
+            ),
             down: Decimator::new(240_000.0, 20_000.0, 161, 5),
             channel: Decimator::new(
                 if config.mode == Mode::Cw {
@@ -181,7 +196,7 @@ impl Receiver {
             cw_fraction: 0,
             cw_phase: 0.0,
             phase: 0.0,
-            step: -TAU * offset_hz / 2_400_000.0,
+            step: -TAU * offset_hz / input_rate as f64,
             dc: 0.0,
             envelope: 0.01,
             previous: None,
@@ -425,5 +440,25 @@ impl StereoDecoder {
             left: (self.deemp.left - self.dc.left).clamp(-1.0, 1.0),
             right: (self.deemp.right - self.dc.right).clamp(-1.0, 1.0),
         })
+    }
+}
+
+#[cfg(test)]
+mod input_rate_tests {
+    use super::*;
+    #[test]
+    fn both_capture_rates_produce_48khz_audio() {
+        for rate in [1_920_000, 2_400_000] {
+            let mut receiver =
+                Receiver::with_input_rate(rate, -250_000.0, ReceiverConfig::default()).unwrap();
+            let input = vec![Iq::default(); rate as usize / 100];
+            let mut audio = Vec::new();
+            receiver.process(&input, &mut audio);
+            assert_eq!(audio.len(), 480, "rate {rate}");
+        }
+        assert!(Receiver::with_input_rate(2_000_000, 0.0, ReceiverConfig::default()).is_err());
+        assert!(
+            Receiver::with_input_rate(1_920_000, 800_000.0, ReceiverConfig::default()).is_err()
+        );
     }
 }

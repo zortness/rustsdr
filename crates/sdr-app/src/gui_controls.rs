@@ -101,6 +101,7 @@ pub(super) fn header(
                                 {
                                     display.source = Source::RtlSdr;
                                     display.rtl_backend = backend;
+                                    display.rtl_devices_scanned = false;
                                     changed = true;
                                     ui.close();
                                 }
@@ -301,8 +302,42 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
             qmx::controls(ui, display);
             return;
         }
-        ui.label("2.400 MS/s · complex f32");
+        ui.label(format!("{:.3} MS/s · complex f32", display.capture_rate() as f64 / 1e6));
         if display.source == Source::RtlSdr {
+            if !display.rtl_devices_scanned { display.refresh_rtl_devices(); }
+            ui.horizontal(|ui| {
+                ui.label("RTL device");
+                if ui.small_button("Refresh").clicked() { display.refresh_rtl_devices(); }
+            });
+            if let Some(error) = &display.rtl_device_error { ui.colored_label(AMBER, error); }
+            let selected = display.rtl_devices.iter().find(|d| d.serial.as_ref().is_some_and(|s| Some(s) == display.rtl_device_serial.as_ref()) || (display.rtl_device_serial.is_none() && d.index == display.rtl_device_index));
+            let label = selected.map_or_else(|| format!("{}: unavailable", display.rtl_device_index), sdr_devices::RtlDevice::label);
+            egui::ComboBox::from_id_salt("rtl-device").selected_text(label).show_ui(ui, |ui| {
+                for device in &display.rtl_devices {
+                    if ui.selectable_label(selected == Some(device), device.label()).clicked() {
+                        display.rtl_device_index = device.index;
+                        display.rtl_device_serial = device.serial.clone();
+                        changed = true;
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Capture rate");
+                egui::ComboBox::from_id_salt("rtl-rate").selected_text(format!("{:.2} MS/s", display.rtl_sample_rate as f64 / 1e6)).show_ui(ui, |ui| {
+                    for rate in [1_920_000, 2_400_000] {
+                        changed |= ui.selectable_value(&mut display.rtl_sample_rate, rate, format!("{:.2} MS/s", rate as f64 / 1e6)).changed();
+                    }
+                });
+            });
+            ui.horizontal(|ui| {
+                ui.label("RF gain");
+                egui::ComboBox::from_id_salt("rtl-gain").selected_text(format!("{:.1} dB", display.rtl_gain_tenth_db as f32 / 10.0)).show_ui(ui, |ui| {
+                    for gain in [0, 87, 144, 197, 254, 280, 328, 364, 421, 496] {
+                        changed |= ui.selectable_value(&mut display.rtl_gain_tenth_db, gain, format!("{:.1} dB", gain as f32 / 10.0)).changed();
+                    }
+                });
+            });
+            ui.small("Gain choices are validated against the selected tuner when reception starts.");
             ui.label("Converter offset");
             let mut offset = display.converter_offset_hz;
             ui.add(egui::DragValue::new(&mut offset).speed(1000).suffix(" Hz"));
@@ -327,7 +362,7 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
                     display.converter_offset_hz = offset;
                     display.converter_correction_hz = correction;
                     let mut t = display.tuning();
-                    t.tune(t.station_hz, 1, false);
+                    t.tune_with_limit(t.station_hz, 1, false, display.vfo_limit());
                     display.station_mhz = t.station_hz as f64 / 1e6;
                     display.rtl_center_hz = t.center_hz;
                     changed = true;
@@ -423,7 +458,7 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
                         let mut tuning = display.tuning();
                         let hz = (tuning.station_hz as i64 + sign * display.tune_step_hz as i64)
                             .clamp(1, 1_700_000_000) as u32;
-                        tuning.tune(hz, display.tune_step_hz, display.source == Source::File);
+                        tuning.tune_with_limit(hz, display.tune_step_hz, display.source == Source::File, display.vfo_limit());
                         display.apply_tuning(tuning);
                     }
                 }
@@ -445,9 +480,10 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
             if display.source == Source::RtlSdr {
                 let (low, high) = sdr_app::engine::scan_bounds(&display.settings());
                 ui.small(format!(
-                    "RF {:.6}–{:.3} MHz · 28 dB RF gain",
+                    "RF {:.6}–{:.3} MHz · {:.1} dB RF gain",
                     low as f64 / 1e6,
-                    high as f64 / 1e6
+                    high as f64 / 1e6,
+                    display.rtl_gain_tenth_db as f32 / 10.0
                 ));
             } else {
                 ui.small("Tune within the recorded capture");
@@ -481,13 +517,13 @@ fn contents(ui: &mut egui::Ui, display: &mut Display) -> (bool, bool) {
         let mut span = display.spectrum_view().span_hz / 1000.0;
         if ui
             .add(
-                egui::Slider::new(&mut span, 0.5..=2400.0)
+                egui::Slider::new(&mut span, 0.5..=display.capture_rate() as f64 / 1000.0)
                     .logarithmic(true)
                     .text("Span kHz"),
             )
             .changed()
         {
-            display.zoom = (2400.0 / span) as f32;
+            display.zoom = (display.capture_rate() as f64 / 1000.0 / span) as f32;
         }
         ui.horizontal(|ui| {
             let fit = ui.button("Fit receiver");

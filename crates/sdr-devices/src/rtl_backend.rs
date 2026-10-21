@@ -43,8 +43,30 @@ impl RtlBackend {
 #[derive(Clone, Debug)]
 pub struct RtlInfo {
     pub backend: RtlBackend,
+    pub device_index: u32,
+    pub device_name: String,
+    pub serial: Option<String>,
     /// Driver-reported configuration, not a calibrated RF measurement.
     pub center_hz: u32,
     pub sample_rate: u32,
     pub gain_tenth_db: Option<i32>,
+    pub requested_gain_tenth_db: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RtlDevice {
+    pub index: u32,
+    pub name: String,
+    pub serial: Option<String>,
+}
+
+impl RtlDevice {
+    pub fn label(&self) -> String {
+        match &self.serial {
+            Some(serial) if !serial.is_empty() => {
+                format!("{}: {} ({serial})", self.index, self.name)
+            }
+            _ => format!("{}: {}", self.index, self.name),
+        }
+    }
 }

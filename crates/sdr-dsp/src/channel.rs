@@ -15,7 +15,7 @@ pub struct Channel {
 }
 impl Channel {
     pub fn new(input_rate: u32, spec: ChannelSpec) -> Result<Self, &'static str> {
-        if input_rate != 2_400_000
+        if ![1_920_000, 2_400_000].contains(&input_rate)
             || ![48_000, 240_000].contains(&spec.sample_rate)
             || spec.bandwidth_hz == 0
             || spec.bandwidth_hz > spec.sample_rate * 2 / 3
@@ -23,10 +23,15 @@ impl Channel {
             || spec.offset_hz.abs() + spec.sample_rate as f64 / 2.0 > input_rate as f64 / 2.0
         {
             return Err(
-                "Channel requires 2.4 MS/s capture, 48/240 kS/s output and a covered passband",
+                "Channel requires 1.92/2.4 MS/s capture, 48/240 kS/s output and a covered passband",
             );
         }
-        let mut stages = vec![Decimator::new(input_rate as f64, 90_000.0, 241, 10)];
+        let mut stages = vec![Decimator::new(
+            input_rate as f64,
+            90_000.0,
+            241,
+            input_rate as usize / 240_000,
+        )];
         if spec.sample_rate == 48_000 {
             stages.push(Decimator::new(
                 240_000.0,
@@ -63,6 +68,28 @@ impl Channel {
             if let Some(s) = sample {
                 output.push(s);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod rate_tests {
+    use super::*;
+    #[test]
+    fn channel_decimates_either_capture_rate_to_240khz() {
+        for rate in [1_920_000, 2_400_000] {
+            let mut channel = Channel::new(
+                rate,
+                ChannelSpec {
+                    offset_hz: 0.0,
+                    sample_rate: 240_000,
+                    bandwidth_hz: 100_000,
+                },
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            channel.process(&vec![Iq::default(); rate as usize / 100], &mut output);
+            assert_eq!(output.len(), 2_400, "rate {rate}");
         }
     }
 }

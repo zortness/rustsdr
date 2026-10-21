@@ -1,6 +1,19 @@
 use sdr_app::tuning::Tuning;
 
 #[test]
+fn narrow_capture_recenters_before_vfo_leaves_passband() {
+    let mut tuning = Tuning {
+        converter_offset_hz: 0,
+        center_hz: 100_000_000,
+        station_hz: 100_000_000,
+    };
+    tuning.tune_with_limit(100_800_000, 1, false, 760_000);
+    assert_eq!(tuning.station_hz, 100_800_000);
+    assert_eq!(tuning.center_hz, 101_050_000);
+    assert!(tuning.station_hz.abs_diff(tuning.center_hz) <= 760_000);
+}
+
+#[test]
 fn converter_mapping_bounds_and_hf_tuning() {
     use sdr_app::tuning::{converter_bounds, tuner_frequency};
     assert_eq!(tuner_frequency(7_100_000, -125_000_000), Some(132_100_000));

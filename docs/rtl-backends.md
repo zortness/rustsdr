@@ -22,7 +22,7 @@ Default and `desktop` builds include both adapters and prefer Rust. A native-onl
 
 ## What to compare
 
-Both adapters request device index 0, normal tuner operation, 2.4 MS/s and 28 dB manual gain. They share unsigned IQ normalization, bounded pooled delivery, sample-index accounting and DSP. This change adds no direct-sampling, bias-tee or TX controls.
+Both adapters discover the connected RTL devices and use the selected USB serial when available. They default to normal tuner operation, 2.4 MS/s and 28 dB manual gain, and offer 1.92 MS/s and other supported tuner gain settings. They share unsigned IQ normalization, bounded pooled delivery, sample-index accounting and DSP. This change adds no direct-sampling, bias-tee or TX controls.
 
 Diagnostics shows the active backend, driver-reported physical tuner frequency/rate, requested gain and available gain readback. These are configuration values, not calibrated RF measurements. The Rust driver's gain getter exposes an encoded register value, so its dB readback is explicitly unavailable.
 
@@ -63,5 +63,7 @@ On 2026-10-03 the user confirmed unplug/replug recovery and sufficient extended 
 The Rust bridge continuously drains the driver's bounded queue into our nonblocking pooled delivery path. Shutdown requests stop and drains pending delivery before joining, avoiding the upstream 0.5.0 full-queue shutdown hazard. Retunes stop/join reads, apply the synchronous frequency setter and restart; the upstream fire-and-forget tuning command does not acknowledge success and is not used. Faults reach the engine, and cancellation timeouts explicitly report a potentially busy device.
 
 Host counters measure application-side loss. They cannot establish that the USB/device FIFO never lost samples; the upstream driver does not expose a complete hardware discontinuity counter. Broader tuner/OS support and sample-clock/gain parity remain areas for further testing.
+
+On 2026-10-20, `m02_live_probe` verified 2.4 → 1.92 → 2.4 MS/s and 28.0 → 32.8 → 28.0 dB on both adapters, with fresh spectrum/audio revisions and no reported host IQ drops. `m02_reconnect_probe` resumed the Rust backend after three physical unplug/reconnect cycles without restarting the process. The connected device reported serial `00000001`; its Windows tuner interface used WinUSB through libwdi `oem169.inf`, version `6.1.7600.16385`. Two dongles were not available to verify simultaneous physical selection.
 
 References: [rs-rtl](https://github.com/xoolive/desperado/tree/589c0df8468159cd9acec3c74c34bd553bf9e7ae/crates/rs-rtl), [stream lifecycle](https://github.com/xoolive/desperado/blob/589c0df8468159cd9acec3c74c34bd553bf9e7ae/crates/rs-rtl/src/rtlsdr.rs), [gain implementation](https://github.com/xoolive/desperado/blob/589c0df8468159cd9acec3c74c34bd553bf9e7ae/crates/rs-rtl/src/tuner.rs).

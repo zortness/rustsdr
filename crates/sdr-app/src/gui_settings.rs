@@ -203,6 +203,26 @@ fn restore(d: &mut Display, doc: &Document, warnings: &mut Vec<String>) {
             }
         }
     }
+    if let Some(index) = section::<u32>(doc, "devices.rtl.device_index", warnings) {
+        d.rtl_device_index = index;
+    }
+    d.rtl_device_serial = section::<Option<String>>(doc, "devices.rtl.device_serial", warnings)
+        .flatten()
+        .filter(|s| !s.is_empty());
+    if let Some(rate) = section::<u32>(doc, "devices.rtl.sample_rate", warnings) {
+        if [1_920_000, 2_400_000].contains(&rate) {
+            d.rtl_sample_rate = rate;
+        } else {
+            warnings.push("Invalid RTL sample rate; using 2.4 MS/s".into());
+        }
+    }
+    if let Some(gain) = section::<i32>(doc, "devices.rtl.gain_tenth_db", warnings) {
+        if (0..=500).contains(&gain) {
+            d.rtl_gain_tenth_db = gain;
+        } else {
+            warnings.push("Invalid RTL gain; using 28 dB".into());
+        }
+    }
     if let Some(offset) = section::<i64>(doc, "devices.rtl.converter_offset_hz", warnings) {
         if sdr_app::tuning::converter_bounds(offset).is_some() {
             d.converter_offset_hz = offset;
@@ -329,6 +349,10 @@ fn snapshot(d: &Display, doc: &mut Document) {
         );
     }
     doc.put("devices.rtl.backend", &d.rtl_backend.key());
+    doc.put("devices.rtl.device_index", &d.rtl_device_index);
+    doc.put("devices.rtl.device_serial", &d.rtl_device_serial);
+    doc.put("devices.rtl.sample_rate", &d.rtl_sample_rate);
+    doc.put("devices.rtl.gain_tenth_db", &d.rtl_gain_tenth_db);
     doc.put("devices.rtl.center_hz", &d.rtl_center_hz);
     doc.put("devices.rtl.converter_offset_hz", &d.converter_offset_hz);
     doc.put("devices.rtl.correction_hz", &d.converter_correction_hz);
@@ -495,6 +519,10 @@ mod tests {
     fn rtl_backend_round_trip_keeps_converter_and_receiver_settings() {
         let d = Display {
             rtl_backend: RtlBackend::Rust,
+            rtl_device_index: 2,
+            rtl_device_serial: Some("unit-serial".into()),
+            rtl_sample_rate: 1_920_000,
+            rtl_gain_tenth_db: 328,
             source: Source::RtlSdr,
             converter_offset_hz: -125_000_000,
             converter_correction_hz: 2700,
@@ -509,6 +537,11 @@ mod tests {
         let mut warnings = Vec::new();
         restore(&mut restored, &doc, &mut warnings);
         assert!(warnings.is_empty());
+        assert_eq!(restored.rtl_device_index, 2);
+        assert_eq!(restored.rtl_device_serial.as_deref(), Some("unit-serial"));
+        assert_eq!(restored.rtl_sample_rate, 1_920_000);
+        assert_eq!(restored.rtl_gain_tenth_db, 328);
+        assert_eq!(restored.spectrum_view().span_hz, 1_920_000.0);
         assert_eq!(restored.rtl_backend, RtlBackend::Rust);
         assert_eq!(restored.settings().rtl_backend, RtlBackend::Rust);
         assert_eq!(restored.settings().tuner_center_hz(), Some(132_321_300));

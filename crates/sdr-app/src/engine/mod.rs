@@ -191,13 +191,11 @@ impl Client {
         }
         match command {
             Command::SpectrumView(view) => {
-                if !view.validate(SAMPLE_RATE as f64) {
+                let mut requested = self.requested.try_lock().map_err(|_| SubmitError::Busy)?;
+                if !view.validate(requested.capture_rate() as f64) {
                     return Err(SubmitError::Invalid);
                 }
-                self.requested
-                    .try_lock()
-                    .map_err(|_| SubmitError::Busy)?
-                    .spectrum_view = view;
+                requested.spectrum_view = view;
             }
             Command::StopScan { revision } => {
                 let slot = self.requested.try_lock().map_err(|_| SubmitError::Busy)?;
@@ -280,7 +278,9 @@ impl Client {
 fn valid(s: &Settings) -> bool {
     (s.source != Source::Ic705 || (cfg!(feature = "ic705") && s.scan.is_none()))
         && s.revision > 0
-        && s.spectrum_view.validate(SAMPLE_RATE as f64)
+        && s.spectrum_view.validate(s.capture_rate() as f64)
+        && [1_920_000, 2_400_000].contains(&s.rtl_sample_rate)
+        && (0..=500).contains(&s.rtl_gain_tenth_db)
         && (s.source != Source::Qmx || (cfg!(feature = "qmx") && s.scan.is_none()))
         && s.cw_decoder.is_none_or(|config| config.validate().is_ok())
         && s.tone_hz.is_finite()
@@ -289,6 +289,8 @@ fn valid(s: &Settings) -> bool {
         && (s.source != Source::RtlSdr
             || (s.rtl_backend.available()
                 && cfg!(feature = "rtl")
+                && (s.station_hz as u64).abs_diff(s.center_hz())
+                    <= u64::from(s.capture_rate() / 2 - 200_000)
                 && crate::tuning::tuner_frequency(s.station_hz as u64, s.converter_offset_hz)
                     .is_some()
                 && s.tuner_center_hz().is_some()))

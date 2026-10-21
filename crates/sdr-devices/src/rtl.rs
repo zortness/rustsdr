@@ -22,6 +22,7 @@ type Callback = unsafe extern "C" fn(*mut u8, u32, *mut c_void);
 struct Api {
     count: unsafe extern "C" fn() -> u32,
     name: unsafe extern "C" fn(u32) -> *const c_char,
+    usb_strings: unsafe extern "C" fn(u32, *mut c_char, *mut c_char, *mut c_char) -> c_int,
     open: unsafe extern "C" fn(*mut Device, u32) -> c_int,
     close: unsafe extern "C" fn(Device) -> c_int,
     rate: SetU32,
@@ -31,6 +32,7 @@ struct Api {
     actual_frequency: unsafe extern "C" fn(Device) -> u32,
     gain_mode: SetInt,
     gain: SetInt,
+    gains: unsafe extern "C" fn(Device, *mut c_int) -> c_int,
     direct: SetInt,
     reset: unsafe extern "C" fn(Device) -> c_int,
     read: unsafe extern "C" fn(Device, Callback, *mut c_void, u32, u32) -> c_int,
@@ -99,6 +101,7 @@ impl Api {
         Ok(Arc::new(Self {
             count: symbol!("rtlsdr_get_device_count"),
             name: symbol!("rtlsdr_get_device_name"),
+            usb_strings: symbol!("rtlsdr_get_device_usb_strings"),
             open: symbol!("rtlsdr_open"),
             close: symbol!("rtlsdr_close"),
             rate: symbol!("rtlsdr_set_sample_rate"),
@@ -109,6 +112,7 @@ impl Api {
             gain_mode: symbol!("rtlsdr_set_tuner_gain_mode"),
             direct: symbol!("rtlsdr_set_direct_sampling"),
             gain: symbol!("rtlsdr_set_tuner_gain"),
+            gains: symbol!("rtlsdr_get_tuner_gains"),
             reset: symbol!("rtlsdr_reset_buffer"),
             read: symbol!("rtlsdr_read_async"),
             cancel: symbol!("rtlsdr_cancel_async"),
@@ -131,6 +135,93 @@ pub fn devices() -> Result<Vec<String>, String> {
                 }
             })
             .collect())
+    }
+}
+
+pub fn discover(backend: crate::RtlBackend) -> Result<Vec<crate::RtlDevice>, String> {
+    match backend {
+        crate::RtlBackend::Librtlsdr => {
+            let api = Api::load()?;
+            // SAFETY: librtlsdr writes at most 256 bytes to each supplied USB string buffer.
+            unsafe {
+                Ok((0..(api.count)())
+                    .map(|index| {
+                        let ptr = (api.name)(index);
+                        let name = if ptr.is_null() {
+                            format!("RTL-SDR {index}")
+                        } else {
+                            CStr::from_ptr(ptr).to_string_lossy().into_owned()
+                        };
+                        let (mut maker, mut product, mut serial) =
+                            ([0 as c_char; 256], [0 as c_char; 256], [0 as c_char; 256]);
+                        let serial = if (api.usb_strings)(
+                            index,
+                            maker.as_mut_ptr(),
+                            product.as_mut_ptr(),
+                            serial.as_mut_ptr(),
+                        ) == 0
+                        {
+                            let value = CStr::from_ptr(serial.as_ptr())
+                                .to_string_lossy()
+                                .into_owned();
+                            (!value.is_empty()).then_some(value)
+                        } else {
+                            None
+                        };
+                        crate::RtlDevice {
+                            index,
+                            name,
+                            serial,
+                        }
+                    })
+                    .collect())
+            }
+        }
+        crate::RtlBackend::Rust => {
+            #[cfg(feature = "rtl-rust")]
+            {
+                let descriptors =
+                    rs_rtl::rtlsdr::DeviceDescriptors::new().map_err(|e| e.to_string())?;
+                Ok(descriptors
+                    .iter()
+                    .map(|d| crate::RtlDevice {
+                        index: d.index as u32,
+                        name: d.product.clone().unwrap_or_else(|| "RTL-SDR".into()),
+                        serial: d.serial.clone(),
+                    })
+                    .collect())
+            }
+            #[cfg(not(feature = "rtl-rust"))]
+            Err("Rust RTL backend was not compiled in".into())
+        }
+    }
+}
+
+pub fn select_device(
+    backend: crate::RtlBackend,
+    index: u32,
+    serial: Option<&str>,
+) -> Result<crate::RtlDevice, String> {
+    let devices = discover(backend)?;
+    let chosen = choose_device(devices, index, serial);
+    chosen.ok_or_else(|| {
+        format!(
+            "Selected RTL device {index}{} is unavailable; refresh devices or reconnect it",
+            serial.map_or(String::new(), |s| format!(" ({s})"))
+        )
+    })
+}
+
+fn choose_device(
+    devices: Vec<crate::RtlDevice>,
+    index: u32,
+    serial: Option<&str>,
+) -> Option<crate::RtlDevice> {
+    match serial.filter(|s| !s.is_empty()) {
+        Some(serial) => devices
+            .into_iter()
+            .find(|d| d.serial.as_deref() == Some(serial)),
+        None => devices.into_iter().find(|d| d.index == index),
     }
 }
 
@@ -253,11 +344,16 @@ fn check(code: c_int, operation: &str) -> Result<(), String> {
 }
 
 impl NativeSession {
-    pub fn open(index: u32, frequency_hz: u32, sample_rate: u32) -> Result<Self, String> {
+    pub fn open(
+        index: u32,
+        frequency_hz: u32,
+        sample_rate: u32,
+        gain_tenth_db: i32,
+    ) -> Result<Self, String> {
         if !(sdr_core::RTL_MIN_HZ..=sdr_core::RX_MAX_HZ).contains(&frequency_hz)
-            || sample_rate != 2_400_000
+            || ![1_920_000, 2_400_000].contains(&sample_rate)
         {
-            return Err("RTL adapter supports normal tuner operation from 28.8 to 1700 MHz at 2.4 MS/s; HF direct sampling is not enabled".into());
+            return Err("RTL adapter supports normal tuner operation at 1.92 or 2.4 MS/s".into());
         }
         let api = Api::load()?;
         let mut device = std::ptr::null_mut();
@@ -274,7 +370,23 @@ impl NativeSession {
             check((native.api.direct)(device, 0), "disable direct sampling")?;
             check((native.api.rate)(device, sample_rate), "sample rate")?;
             check((native.api.gain_mode)(device, 1), "manual tuner gain")?;
-            check((native.api.gain)(device, 280), "28 dB tuner gain")?;
+            let count = (native.api.gains)(device, std::ptr::null_mut());
+            if !(1..=128).contains(&count) {
+                return Err("RTL tuner gain list is unavailable".into());
+            }
+            let mut gains = vec![0; count as usize];
+            check(
+                (native.api.gains)(device, gains.as_mut_ptr()),
+                "tuner gain list",
+            )?;
+            if !gains.contains(&gain_tenth_db) {
+                return Err(format!(
+                    "Unsupported tuner gain {:.1} dB; available: {:?}",
+                    gain_tenth_db as f32 / 10.0,
+                    gains
+                ));
+            }
+            check((native.api.gain)(device, gain_tenth_db), "tuner gain")?;
             check((native.api.reset)(device), "reset buffer")?;
             let actual_rate = (native.api.actual_rate)(device);
             let actual_frequency = (native.api.actual_frequency)(device);
@@ -433,7 +545,7 @@ enum Implementation {
 }
 impl RtlSession {
     pub fn open(index: u32, hz: u32, rate: u32) -> Result<Self, String> {
-        Self::open_with(crate::RtlBackend::default(), index, hz, rate)
+        Self::open_configured(crate::RtlBackend::default(), index, None, hz, rate, 280)
     }
     pub fn open_with(
         backend: crate::RtlBackend,
@@ -441,20 +553,47 @@ impl RtlSession {
         hz: u32,
         rate: u32,
     ) -> Result<Self, String> {
-        if !(sdr_core::RTL_MIN_HZ..=sdr_core::RX_MAX_HZ).contains(&hz) || rate != 2_400_000 {
-            return Err("RTL requires normal tuner coverage at 2.4 MS/s".into());
+        Self::open_configured(backend, index, None, hz, rate, 280)
+    }
+    pub fn open_configured(
+        backend: crate::RtlBackend,
+        index: u32,
+        serial: Option<&str>,
+        hz: u32,
+        rate: u32,
+        gain_tenth_db: i32,
+    ) -> Result<Self, String> {
+        if !(sdr_core::RTL_MIN_HZ..=sdr_core::RX_MAX_HZ).contains(&hz)
+            || ![1_920_000, 2_400_000].contains(&rate)
+            || !(0..=500).contains(&gain_tenth_db)
+        {
+            return Err(
+                "RTL requires normal tuner coverage, 1.92/2.4 MS/s and 0–50 dB gain".into(),
+            );
         }
+        let selected = select_device(backend, index, serial)?;
         let (implementation, gain) = match backend {
             crate::RtlBackend::Librtlsdr => {
-                let session = NativeSession::open(index, hz, rate)?;
+                let session = NativeSession::open(selected.index, hz, rate, gain_tenth_db)?;
                 // SAFETY: getter accesses the configured device; no tuner writes occur during reads.
                 let gain = unsafe { (session.native.api.actual_gain)(session.native.device) };
+                if gain != gain_tenth_db {
+                    return Err(format!(
+                        "RTL tuner gain readback mismatch: requested {gain_tenth_db}, reported {gain}"
+                    ));
+                }
                 (Implementation::Native(session), Some(gain))
             }
             crate::RtlBackend::Rust => {
                 #[cfg(feature = "rtl-rust")]
                 {
-                    let (session, gain) = rust_backend::RustSession::open(index, hz, rate)?;
+                    let (session, gain) = rust_backend::RustSession::open(
+                        selected.index,
+                        selected.serial.as_deref(),
+                        hz,
+                        rate,
+                        gain_tenth_db,
+                    )?;
                     (Implementation::Rust(session), gain)
                 }
                 #[cfg(not(feature = "rtl-rust"))]
@@ -467,9 +606,13 @@ impl RtlSession {
             implementation,
             info: crate::RtlInfo {
                 backend,
+                device_index: selected.index,
+                device_name: selected.name,
+                serial: selected.serial,
                 center_hz: hz,
                 sample_rate: rate,
                 gain_tenth_db: gain,
+                requested_gain_tenth_db: gain_tenth_db,
             },
         })
     }
@@ -518,6 +661,33 @@ impl RtlSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn serial_selection_survives_index_reordering_and_refuses_missing_device() {
+        let devices = vec![
+            crate::RtlDevice {
+                index: 0,
+                name: "second".into(),
+                serial: Some("B".into()),
+            },
+            crate::RtlDevice {
+                index: 1,
+                name: "first".into(),
+                serial: Some("A".into()),
+            },
+        ];
+        assert_eq!(
+            choose_device(devices.clone(), 0, Some("A")).unwrap().index,
+            1
+        );
+        assert_eq!(
+            choose_device(devices.clone(), 0, None)
+                .unwrap()
+                .serial
+                .as_deref(),
+            Some("B")
+        );
+        assert!(choose_device(devices, 0, Some("missing")).is_none());
+    }
     #[test]
     fn shared_delivery_preserves_sample_positions_across_overflow_and_retune() {
         let (recycle, free) = mpsc::sync_channel(1);
